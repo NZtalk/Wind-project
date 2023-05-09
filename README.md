@@ -1,3 +1,9 @@
+# Installation
+
+`docker-compose build`
+
+`docker-compose up -d`
+
 # Stage 1 : Scraping
 
 - WindAPI.py class to get data from API
