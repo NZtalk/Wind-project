@@ -5,7 +5,7 @@ ENV PATH="${PATH}:${POETRY_HOME}/bin"
 
 # set the working directory
 WORKDIR /app
-COPY poetry.lock pyproject.toml .
+COPY poetry.lock pyproject.toml ./
 
 # install dependencies
 RUN apt update -y && apt upgrade -y && apt install curl -y

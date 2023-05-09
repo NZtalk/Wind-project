@@ -4,6 +4,10 @@
 
 `docker-compose up -d`
 
+## Access Docker containers
+
+`docker exec -it python-itw bash`
+
 # Stage 1 : Scraping
 
 - WindAPI.py class to get data from API

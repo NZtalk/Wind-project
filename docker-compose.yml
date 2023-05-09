@@ -3,7 +3,7 @@ version: "3.5"
 services:
   python:
     build: .
-    container_name: app-itw
+    container_name: python-itw
     command: uvicorn src.main:app --host 0.0.0.0 --port 80 --reload
     ports:
       - 80:80
@@ -12,22 +12,40 @@ services:
       - .:/app
     depends_on:
       - mongodb
+      - mariadb
     networks:
       - app-itw
   
   mongodb:
-    image: mongo:4.0.8
-    container_name: mongodb
+    image: mongo:6.0
+    container_name: mongodb-itw
     restart: unless-stopped
     command: mongod --auth
     environment:
-      MONGO_INITDB_ROOT_USERNAME: mongo
-      MONGO_INITDB_ROOT_PASSWORD: password
-      MONGO_INITDB_DATABASE: itw
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
       MONGODB_DATA_DIR: /data/db
       MONDODB_LOG_DIR: /dev/null
     volumes:
-      - mongodbdata:/data/db
+      - mongodb-data:/data/db
+    networks:
+      - app-itw
+
+  mariadb:
+    image: mariadb:10.11
+    container_name: mariadb-itw
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MARIADB_DATABASE}
+      MYSQL_USER: ${MARIADB_USER}
+      MYSQL_PASSWORD: ${MARIADB_PASSWORD}
+    volumes:
+      - mariadb-data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    expose:
+      - "3306"
     networks:
       - app-itw
 
@@ -36,5 +54,7 @@ networks:
     driver: bridge
 
 volumes:
-  mongodbdata:
+  mongodb-data:
+    driver: local
+  mariadb-data:
     driver: local
