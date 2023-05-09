@@ -102,7 +102,7 @@ if __name__ == '__main__':
     df = WindAPI(url).get(payload)
     insert_to_mongo(df, collection)
 
-    # Continuously update the database every 6 seconds with new data after the end date
+    # Continuously update the database every 10 minutes with new data after the end date
     while True:
         # Check if it's time to start updating the database
         now = pd.to_datetime("now")
