@@ -1,0 +1,40 @@
+version: "3.5"
+
+services:
+  python:
+    build: .
+    container_name: app-itw
+    command: uvicorn src.main:app --host 0.0.0.0 --port 80 --reload
+    ports:
+      - 80:80
+      - 5678:5678
+    volumes:
+      - .:/app
+    depends_on:
+      - mongodb
+    networks:
+      - app-itw
+  
+  mongodb:
+    image: mongo:4.0.8
+    container_name: mongodb
+    restart: unless-stopped
+    command: mongod --auth
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mongo
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: itw
+      MONGODB_DATA_DIR: /data/db
+      MONDODB_LOG_DIR: /dev/null
+    volumes:
+      - mongodbdata:/data/db
+    networks:
+      - app-itw
+
+networks:
+  app-itw:
+    driver: bridge
+
+volumes:
+  mongodbdata:
+    driver: local

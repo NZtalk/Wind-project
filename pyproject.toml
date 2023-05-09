@@ -1,0 +1,26 @@
+[tool.poetry]
+name = "itw-app"
+version = "0.1.0"
+description = "WindTurbines SCADA Data scraping + API for DST Data Engineer project"
+authors = ["Benjamin Guégan <guegan.be@gmail.com>", "Louis Valton <louis.valton@gmail.com>", "Nabil Zenaini <nabil.zenaini2@gmail.com>", "Matthieu Diard <mdiard@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+fastapi = "^0.95.1"
+uvicorn = {extras = ["standard"], version = "^0.22.0"}
+ipykernel = "^6.15.3"
+pandas = "^2.0.1"
+requests = "^2.29.0"
+poetry-dotenv = "^0.4.0"
+jupyter = "^1.0.0"
+flake8 = "^6.0.0"
+python-dotenv = "^1.0.0"
+python-decouple = "^3.8"
+pymongo = "^4.3.3"
+
+[tool.poetry.dev-dependencies]
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
