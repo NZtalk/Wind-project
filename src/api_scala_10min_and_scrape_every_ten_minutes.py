@@ -108,8 +108,8 @@ if __name__ == '__main__':
         now = pd.to_datetime("now")
         end_date = pd.to_datetime(payload["end_date"])
         if now >= end_date:
-            # Set start date to be 6 seconds after the current time
-            start_date = now + pd.Timedelta(seconds=6)
+            # Set start date to be 10 minutes after the current time
+            start_date = now + pd.Timedelta(minutes=10)
 
             # Update the payload with the new start and end dates
             payload["start_date"] = start_date.strftime("%Y-%m-%d %H:%M:%S")
