@@ -28,7 +28,7 @@ class WindAPI:
           self.url = url
           self.headers = { "X-Auth-Token": os.environ["Token"], "Content-Type": "application/json"}
 
-      def get(self,payload_dict: dict = None):
+      def get(self,payload_dict: dict = None, ref_id = None):
           """
           function to get data from API, convert to json and then convert to df
 
@@ -41,6 +41,8 @@ class WindAPI:
           response = requests.request("GET", self.url, json=payload_dict, headers=self.headers)
           data = response.json()
           df = pd.DataFrame.from_records(data)
+          if payload_dict:
+               df[list(payload_dict.keys())[0]]=list(payload_dict.values())[0]
           return df
  
       def multithread_get(self,list_payload: list)-> pd.DataFrame:
