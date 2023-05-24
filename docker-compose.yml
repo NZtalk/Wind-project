@@ -48,18 +48,6 @@ services:
     networks:
       - app-itw
 
-  mariadb:
-    image: mariadb:latest
-    container_name: mariadb
-    restart: unless-stopped
-    environment:
-      MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: itw
-    volumes:
-      - mariadbdata:/var/lib/mysql
-    networks:
-      - app-itw
-
   kafka-connect-mongodb:
     image: confluentinc/kafka-connect-mongodb:latest
     container_name: kafka-connect-mongodb
