@@ -21,6 +21,8 @@ pymongo = "^4.3.3"
 flask = "^2.3.2"
 mysql-connector-python = "^8.0.33"
 pytest = "^7.3.1"
+sqlalchemy = "^2.0.13"
+pymysql = "^1.0.3"
 
 [tool.poetry.dev-dependencies]
 
