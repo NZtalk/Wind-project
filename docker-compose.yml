@@ -12,7 +12,6 @@ services:
       - .:/app
     depends_on:
       - mongodb
-      - mariadb
     networks:
       - app-itw
   
@@ -49,6 +48,41 @@ services:
     networks:
       - app-itw
 
+  mariadb:
+    image: mariadb:latest
+    container_name: mariadb
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: password
+      MYSQL_DATABASE: itw
+    volumes:
+      - mariadbdata:/var/lib/mysql
+    networks:
+      - app-itw
+
+  kafka-connect-mongodb:
+    image: confluentinc/kafka-connect-mongodb:latest
+    container_name: kafka-connect-mongodb
+    restart: unless-stopped
+    depends_on:
+      - kafka
+      - mongodb
+    environment:
+      CONNECT_BOOTSTRAP_SERVERS: kafka:9092
+      CONNECT_REST_PORT: 8083
+      CONNECT_GROUP_ID: connect-mongodb-group
+      CONNECT_CONFIG_STORAGE_TOPIC: docker-connect-configs
+      CONNECT_OFFSET_STORAGE_TOPIC: docker-connect-offsets
+      CONNECT_STATUS_STORAGE_TOPIC: docker-connect-status
+      CONNECT_KEY_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER: org.apache.kafka.connect.json.JsonConverter
+      CONNECT_VALUE_CONVERTER_SCHEMAS_ENABLE: "false"
+      CONNECT_PLUGIN_PATH: "/usr/share/java,/usr/share/confluent-hub-components"
+    volumes:
+      - ./connectors/mongodb-sink-connector.json:/etc/kafka-connect-mongodb/mongodb-sink-connector.json
+    networks:
+      - app-itw
+
 networks:
   app-itw:
     driver: bridge
@@ -57,4 +91,6 @@ volumes:
   mongodb-data:
     driver: local
   mariadb-data:
+    driver: local
+  mariadbdata:
     driver: local
