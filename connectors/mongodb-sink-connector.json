@@ -1,0 +1,20 @@
+{
+  "name": "mongodb-sink-connector",
+  "config": {
+    "connector.class": "com.mongodb.kafka.connect.MongoSinkConnector",
+    "tasks.max": "1",
+    "topics": "nom_du_topic_source", // inscrire le topic kafka
+    "connection.uri": "mongodb://mongo:password@mongodb:27017", // configurer mot de passe mongodb
+    "database": "nom_de_la_base_de_donnees", //nom de la base de donnée dans mariadb
+    "collection": "nom_de_la_collection", // nom de la collection dans mongodb
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "key.converter.schemas.enable": "false",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    "transforms": "unwrap",
+    "transforms.unwrap.type": "io.debezium.transforms.ExtractNewRecordState",
+    "transforms.unwrap.drop.tombstones": "false",
+    "transforms.unwrap.delete.handling.mode": "drop",
+    "transforms.unwrap.operation.header": "true"
+  }
+}
