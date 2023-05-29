@@ -75,7 +75,7 @@ class ScadaDataProcessor:
         
         payload = []
         
-        d30_datetime = datetime.now() - timedelta(days=3)
+        d30_datetime = datetime.now() - timedelta(days=30)
         current_datetime = datetime.now()
         
         for turbine in turbines:
