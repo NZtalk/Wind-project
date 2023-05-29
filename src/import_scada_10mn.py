@@ -30,52 +30,28 @@ mariadb_password = os.getenv("MARIADB_PASSWORD")
 client = mongodb_connection()
 eng = mariadb_connection()
 
-class ScadaDataProcessor:
-    def __init__(self, mongodb_username, mongodb_password, mongodb_database, mariadb_user, mariadb_root_password,
-                 mariadb_database, mariadb_password):
-        # Connexion à MongoDB
-        mongodb_url = f"mongodb://{mongodb_username}:{mongodb_password}@localhost:27017/{mongodb_database}"
-        self.mongo_client = pymongo.MongoClient(mongodb_url)
-        self.mongo_db = self.mongo_client[mongodb_database]
-        self.mongo_collection = self.mongo_db['scada_data']
-
-        # Connexion à MariaDB
-        # try:
-        #     self.mariadb_connection = mysql.connector.connect(
-        #         host='mariadb',
-        #         port=3306,
-        #         database=mariadb_database,
-        #         user=mariadb_user,
-        #         password=mariadb_password
-        #     )
-        #     if self.mariadb_connection.is_connected():
-        #         self.mariadb_cursor = self.mariadb_connection.cursor()
-
-        # except Error as e:
-        #     print("Error while connecting to MariaDB:", e)
-
 def process_scada_data():
-    # Récupérer les identifiants de turbines depuis la table windturbine dans MariaDB
+    # Récupérer les identifiants et last scada update de turbines depuis la table windturbine dans MariaDB
     stmt = select(windturbines.c['windturbine_id','last_scada_update'])
     turbines = []
     with Session(eng) as session:
         for row in session.execute(stmt):
             turbines.append(row)
     # Traiter les données SCADA pour chaque turbine
-    total_processed = process_turbines(turbines)
+    return process_turbines(turbines)
 
-    #return total_processed
 
 def process_turbines(turbines):
-    total_processed = 0
     
+    # Payload for API Scada multi-thread call
     payload = []
     
-    d30_datetime = datetime.now() - timedelta(days=3)
+    d30_datetime = datetime.now() - timedelta(days=30)
     current_datetime = datetime.now()
     
     for turbine in turbines:
         last_scada_update = turbine[1]
+        # Default start date to D-30
         if (last_scada_update == None):
             last_scada_update = d30_datetime
             
@@ -87,13 +63,15 @@ def process_turbines(turbines):
     
     scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
     df_scada = scada_api.multithread_get(payload)
-    print(df_scada.count)
+    
     if (df_scada.empty == False):
+        # Insert rows in MongoDB collection
         client["scada"].insert_many(df_scada.to_dict('records'))
         for turbine in turbines:
             windturbine_id = turbine[0]
             last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
             if (isinstance(last_windturbine_log_date, str)):
+                # Update Windturbine last scada update records
                 last_windturbine_log_datetime = (datetime.
                                                 strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S").
                                                 astimezone(pytz.timezone('Europe/Paris')).strftime('%Y-%m-%d %H:%M:%S'))
@@ -103,7 +81,6 @@ def process_turbines(turbines):
                 with Session(eng) as session:
                     session.execute(stmt)
                     session.commit()
-                    total_processed += 1
         
     return df_scada.count
 
