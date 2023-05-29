@@ -4,14 +4,15 @@ import os
 
 load_dotenv()
 
-user=os.environ["MARIADB_USER"]
-password=os.environ["MARIADB_PASSWORD"]
-dbname=os.environ["MARIADB_DATABASE"]
-SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{user}:{password}@mariadb:3306/{dbname}'
+def mariadb_connection():
+    user=os.environ["MARIADB_USER"]
+    password=os.environ["MARIADB_PASSWORD"]
+    dbname=os.environ["MARIADB_DATABASE"]
+    SQLALCHEMY_DATABASE_URI = f'mysql+pymysql://{user}:{password}@mariadb:3306/{dbname}'
+    eng = create_engine(SQLALCHEMY_DATABASE_URI).connect()
+    return eng
 
-
-# Test if it works
-eng = create_engine(SQLALCHEMY_DATABASE_URI).connect()
+eng = mariadb_connection()
 
 #Create table
 meta = MetaData()
@@ -25,7 +26,6 @@ windfarms = Table(
    Column('last_meteo_update', DATETIME)
   
 ) 
-
 
 windturbines = Table(
    'windturbines', meta, 
@@ -45,5 +45,3 @@ powercurves = Table(
 )
 
 meta.create_all(eng)
-
-
