@@ -15,12 +15,12 @@ services:
       - mariadb
     networks:
       - app-itw
-
+  
   mongodb:
     image: mongo:6.0
     container_name: mongodb-itw
     restart: unless-stopped
-    command: mongod --auth --bind_ip_all --port 27017 --replSet "rs0"
+    command: mongod --auth
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
