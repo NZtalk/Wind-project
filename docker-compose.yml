@@ -15,12 +15,12 @@ services:
       - mariadb
     networks:
       - app-itw
-  
+
   mongodb:
     image: mongo:6.0
     container_name: mongodb-itw
     restart: unless-stopped
-    command: mongod --auth
+    command: mongod --auth --bind_ip_all --port 27017 --replSet "rs0"
     environment:
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
       MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
@@ -31,6 +31,24 @@ services:
       - mongodb-data:/data/db
     ports:
       - "27017:27017"
+    networks:
+      - app-itw
+
+  mongodb-secondary:
+    image: mongo:6.0
+    container_name: mongodb-itw-secondary
+    restart: unless-stopped
+    command: mongod --auth --bind_ip_all --port 27018 --replSet "rs0"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE}
+      MONGODB_DATA_DIR: /data/db
+      MONDODB_LOG_DIR: /dev/null
+    volumes:
+      - mongodb-secondary-data:/data/db
+    ports:
+      - "27018:27018"
     networks:
       - app-itw
 
@@ -58,5 +76,9 @@ networks:
 volumes:
   mongodb-data:
     driver: local
+  mongodb-secondary-data:
+    driver: local
   mariadb-data:
     driver: local
+
+
