@@ -82,7 +82,7 @@ def process_turbines(turbines):
                     session.execute(stmt)
                     session.commit()
         
-    return df_scada.count
+    return len(df_scada.index)
 
 
 # Traitement des données SCADA
