@@ -34,7 +34,7 @@ windturbines = Table(
    Column('code', VARCHAR(100)),
    Column('latitude', FLOAT),
    Column('longitude', FLOAT),
-   Column('last_scada_udpdate', DATETIME)
+   Column('last_scada_update', DATETIME)
 )
 
 powercurves = Table(
