@@ -1,8 +1,8 @@
 import pymongo
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, select, update, bindparam
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 import os
 from dotenv import load_dotenv
@@ -12,8 +12,8 @@ from mysql.connector import Error
 from classes.WindAPI import *
 from datetime import datetime, timedelta
 from create_ref_mongodb import mongodb_connection
-from create_ref_mariadb import mariadb_connection
-
+from create_ref_mariadb import mariadb_connection, windturbines
+import pytz
 # Charger les variables d'environnement à partir du fichier .env
 load_dotenv()
 
@@ -27,13 +27,8 @@ mariadb_root_password = os.getenv("MARIADB_ROOT_PASSWORD")
 mariadb_database = os.getenv("MARIADB_DATABASE")
 mariadb_password = os.getenv("MARIADB_PASSWORD")
 
-
 client = mongodb_connection()
 eng = mariadb_connection()
-
-
-Base = declarative_base()
-
 
 class ScadaDataProcessor:
     def __init__(self, mongodb_username, mongodb_password, mongodb_database, mariadb_user, mariadb_root_password,
@@ -45,128 +40,74 @@ class ScadaDataProcessor:
         self.mongo_collection = self.mongo_db['scada_data']
 
         # Connexion à MariaDB
-        try:
-            self.mariadb_connection = mysql.connector.connect(
-                host='mariadb',
-                port=3306,
-                database=mariadb_database,
-                user=mariadb_user,
-                password=mariadb_password
-            )
-            if self.mariadb_connection.is_connected():
-                db_info = self.mariadb_connection.get_server_info()
-                print("Connected to MariaDB Server version:", db_info)
-                self.mariadb_cursor = self.mariadb_connection.cursor()
+        # try:
+        #     self.mariadb_connection = mysql.connector.connect(
+        #         host='mariadb',
+        #         port=3306,
+        #         database=mariadb_database,
+        #         user=mariadb_user,
+        #         password=mariadb_password
+        #     )
+        #     if self.mariadb_connection.is_connected():
+        #         self.mariadb_cursor = self.mariadb_connection.cursor()
 
-        except Error as e:
-            print("Error while connecting to MariaDB:", e)
+        # except Error as e:
+        #     print("Error while connecting to MariaDB:", e)
 
-    def process_scada_data(self):
-        # Récupérer les identifiants de turbines depuis la table windturbine dans MariaDB
-        turbines = self.get_turbines()
+def process_scada_data():
+    # Récupérer les identifiants de turbines depuis la table windturbine dans MariaDB
+    stmt = select(windturbines.c['windturbine_id','last_scada_update'])
+    turbines = []
+    with Session(eng) as session:
+        for row in session.execute(stmt):
+            turbines.append(row)
+    # Traiter les données SCADA pour chaque turbine
+    total_processed = process_turbines(turbines)
 
-        # Traiter les données SCADA pour chaque turbine
-        total_processed = self.process_turbines(turbines)
+    #return total_processed
 
-        return total_processed
-
-    def process_turbines(self, turbines):
-        total_processed = 0
-        
-        payload = []
-        
-        d30_datetime = datetime.now() - timedelta(days=3)
-        current_datetime = datetime.now()
-        
-        for turbine in turbines:
-            last_scada_update = turbine[1]
-            if (last_scada_update == None):
-                last_scada_update = d30_datetime
-                
-            payload.append({
-                'windturbine_id': turbine[0],
-                'start_date': last_scada_update.strftime("%Y-%m-%d %H:%M:%S"),
-                'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-            })
-        
-        scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
-        df_scada = scada_api.multithread_get(payload)
-        client["scada"].insert_many(df_scada.to_dict('records'))
-        
-        for turbine in turbines:
+def process_turbines(turbines):
+    total_processed = 0
+    
+    payload = []
+    
+    d30_datetime = datetime.now() - timedelta(days=3)
+    current_datetime = datetime.now()
+    
+    for turbine in turbines:
+        last_scada_update = turbine[1]
+        if (last_scada_update == None):
+            last_scada_update = d30_datetime
             
-        # with ThreadPoolExecutor(max_workers=20) as executor:
-        #     futures = []
-        #     for turbine in turbines:
-        #         future = executor.submit(self.fetch_and_process_scada_data, turbine_id)
-        #         futures.append(future)
+        payload.append({
+            'windturbine_id': turbine[0],
+            'start_date': last_scada_update.strftime("%Y-%m-%d %H:%M:%S"),
+            'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        })
+    
+    scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
+    df_scada = scada_api.multithread_get(payload)
+    print(df_scada.count)
+    if (df_scada.empty == False):
+        client["scada"].insert_many(df_scada.to_dict('records'))
+        for turbine in turbines:
+            windturbine_id = turbine[0]
+            last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
+            if (isinstance(last_windturbine_log_date, str)):
+                last_windturbine_log_datetime = (datetime.
+                                                strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S").
+                                                astimezone(pytz.timezone('Europe/Paris')).strftime('%Y-%m-%d %H:%M:%S'))
+                stmt = (update(windturbines).
+                        where(windturbines.c.windturbine_id == windturbine_id).
+                        values(last_scada_update=last_windturbine_log_datetime))
+                with Session(eng) as session:
+                    session.execute(stmt)
+                    session.commit()
+                    total_processed += 1
+        
+    return df_scada.count
 
-        #     for future in as_completed(futures):
-        #         total_processed += future.result()
-
-        # return total_processed
-
-    def fetch_and_process_scada_data(self, turbine_id):
-        url = "https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data"
-        last_timestamp = self.get_last_timestamp(turbine_id)
-        start_date = last_timestamp.strftime("%Y-%m-%d %H:%M:%S") if last_timestamp else None
-        end_date = "2023-05-28 00:00:00"
-
-        payload = {
-            "windturbine_id": turbine_id,
-            "start_date": start_date,
-            "end_date": end_date
-        }
-
-        response = requests.post(url, json=payload)
-        scada_data = response.json()
-
-        new_data = []
-        for data in scada_data:
-            if not self.is_data_present(turbine_id, data['timestamp']):
-                new_data.append(data)
-
-        # Stocker les nouvelles données dans MongoDB
-        self.mongo_collection.insert_many(new_data)
-
-        # Mettre à jour le référentiel MariaDB avec les nouvelles données
-        self.update_mariadb_referential(new_data)
-
-        return len(new_data)
-
-    def is_data_present(self, turbine_id, timestamp):
-        query = f"SELECT * FROM scadadata WHERE turbine_id = {turbine_id} AND timestamp = '{timestamp}'"
-        self.mariadb_cursor.execute(query)
-        result = self.mariadb_cursor.fetchone()
-        return result is not None
-
-    def get_last_timestamp(self, turbine_id):
-        query = f"SELECT timestamp FROM scadadata WHERE turbine_id = {turbine_id} ORDER BY timestamp DESC LIMIT 1"
-        self.mariadb_cursor.execute(query)
-        result = self.mariadb_cursor.fetchone()
-        if result:
-            return result[0]
-        return None
-
-    def update_mariadb_referential(self, scada_data):
-        for data in scada_data:
-            query = f"INSERT INTO scadadata (turbine_id, scada_value, timestamp) VALUES ({data['windturbine_id']}, " \
-                    f"{data['scada_value']}, '{data['timestamp']}')"
-            self.mariadb_cursor.execute(query)
-
-        self.mariadb_connection.commit()
-
-    def get_turbines(self):
-        query = "SELECT windturbine_id as id, last_scada_update FROM windturbines"
-        self.mariadb_cursor.execute(query)
-        turbines = [[row[0], row[1]] for row in self.mariadb_cursor.fetchall()]
-        return turbines
-
-
-# Création d'une instance de ScadaDataProcessor
-scada_processor = ScadaDataProcessor(mongodb_username, mongodb_password, mongodb_database, mariadb_user,
-                                     mariadb_root_password, mariadb_database, mariadb_password)
 
 # Traitement des données SCADA
-total_processed = scada_processor.process_scada_data()
-print(f"Total processed: {total_processed}")
+total_processed = process_scada_data()
+print(f"Total data SCADA processed: {total_processed}")
