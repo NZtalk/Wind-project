@@ -1,58 +1,42 @@
 import requests
-from pprint import pprint
 from datetime import datetime
-from decouple import config
+import pandas as pd
+from dotenv import load_dotenv
+import os
+
+load_dotenv() 
 
 class ForecastWeatherAPI:
     """
-    A class dedicated to retrieve forecast weather data (5 day forecast, every 3 hours) from Open Weather Map API.
+    A class dedicated to retrieve weather data from Open Weather Map API.
     """
 
-    def __init__(self):
+    def __init__(self, url):
         """
-        Initialization get the API key from the .env.
+        Initialization get the API key from the .env. and the url of the API.
         """
-        self.key = config("API_WEATHER_KEY")
+        self.key = os.environ["API_WEATHER_KEY"]
+        self.url = url
     
-    def get(self, coord: dict) -> dict:
+    def get_data(self, df: pd.DataFrame) -> dict:
         """
         Method to retrieve the data from the API.
         Args:
-            coord (dict): coordinates of the requested weather forecast following the format {"lat": x, "lon": y} 
+            df (DataFrame): df with 3 columns: windfarm_id, lat and long.
         Return:
             Extensive data from the API in a json format. 
         """
-        self.coord = coord
-        r = requests.get(url="https://api.openweathermap.org/data/2.5/forecast?lat={}&lon={}&appid={}"
-                         .format(self.coord["lat"], self.coord["lon"], self.key ))
-        self.data_api = r.json()
-        return self.data_api
-    
-    def transform(data: dict) -> dict:
-        """
-        Method to select the data needed (wind stats) and add additional information (retrieve date).
-        Return:
-            Extensive data from the API in a json format. 
-        """
-        data_list = []
-        data_clean = {}
-        
-        for dict in data["list"]:
-            for key, value in dict.items():
-                data_temp = {}
-                if key == "wind" or key == "dt_txt":
-                    data_temp[key] = value
-                else:
-                    continue
-                data_list.append(data_temp)
-        data_clean["extract_date"] = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
-        data_clean["weather"] = data_list
-        data_clean["coordinates"] = data["city"]["coord"]
-        return data_clean
-
-# Check
-
-coordinate = {"lat": 49.7836416, "lon": 2.7646835}
-#coordinate = {"lat": "a", "lon": 2.7646835}
-weather_data = ForecastWeatherAPI().get(coordinate)
-pprint(ForecastWeatherAPI.transform(weather_data))
+        list_responses = []
+        dict = {}
+        for index, row in df.iterrows():
+            windfarm_id = row["windfarm_id"]
+            lat = row["latitude"]
+            lon = row["longitude"]
+            response = requests.get("{}?lat={}&lon={}&appid={}"
+                                    .format(self.url, lat, lon, self.key ))
+            data = response.json()
+            data["windfarm_id"] = windfarm_id
+            list_responses.append(data)
+        dict["extract_date"] = datetime.now().strftime("%m-%d-%Y %H:%M:%S")
+        dict["data"]= list_responses
+        return dict

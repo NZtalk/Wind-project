@@ -11,6 +11,8 @@ import mysql.connector
 from mysql.connector import Error
 from classes.WindAPI import *
 from datetime import datetime, timedelta
+from create_ref_mongodb import mongodb_connection
+from create_ref_mariadb import mariadb_connection
 
 # Charger les variables d'environnement à partir du fichier .env
 load_dotenv()
@@ -24,6 +26,11 @@ mariadb_user = os.getenv("MARIADB_USER")
 mariadb_root_password = os.getenv("MARIADB_ROOT_PASSWORD")
 mariadb_database = os.getenv("MARIADB_DATABASE")
 mariadb_password = os.getenv("MARIADB_PASSWORD")
+
+
+client = mongodb_connection()
+eng = mariadb_connection()
+
 
 Base = declarative_base()
 
@@ -84,7 +91,10 @@ class ScadaDataProcessor:
         
         scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
         df_scada = scada_api.multithread_get(payload)
-        self.mongo_collection.insert_many(df_scada.to_dict('records'))
+        client["scada"].insert_many(df_scada.to_dict('records'))
+        
+        for turbine in turbines:
+            
         # with ThreadPoolExecutor(max_workers=20) as executor:
         #     futures = []
         #     for turbine in turbines:
