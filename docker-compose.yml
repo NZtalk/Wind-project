@@ -12,6 +12,7 @@ services:
       - .:/app
     depends_on:
       - mongodb
+      - mongodb-secondary
       - mariadb
     networks:
       - app-itw
@@ -48,7 +49,7 @@ services:
     volumes:
       - mongodb-secondary-data:/data/db
     ports:
-      - "27018:27018"
+      - "27018:27017"
     networks:
       - app-itw
 
@@ -80,5 +81,3 @@ volumes:
     driver: local
   mariadb-data:
     driver: local
-
-
