@@ -12,6 +12,7 @@ services:
       - .:/app
     depends_on:
       - mongodb
+      - mariadb
     networks:
       - app-itw
   
