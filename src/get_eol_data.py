@@ -18,7 +18,7 @@ if __name__ == '__main__':
     list_payload = df_parc[['windfarm_id']].drop_duplicates().to_dict('records')
     df_turbines = turbines_api.multithread_get(list_payload)
     df_turbines = df_turbines.rename(columns={"id": "windturbine_id"})
-    #print(df_turbines)
+    print(df_turbines)
 
     df_farms = df_turbines[['windfarm_id','lat','lng']]
     pd.set_option('display.max_rows', 500)
