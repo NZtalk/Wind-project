@@ -28,14 +28,14 @@ def process_turbines(turbines):
     # Payload for API Scada multi-thread call
     payload = []
     
-    d90_datetime = datetime.now() - timedelta(days=90)
+    d30_datetime = datetime.now() - timedelta(days=30)
     tz = pytz.timezone('Europe/Paris')
     current_datetime = datetime.now(tz)
     
     # Payload construction for API Request with list comprehension
     payload = [{
         'windturbine_id': t[0], 
-        'start_date': d90_datetime.strftime("%Y-%m-%d %H:%M:%S") if t[1] == None else t[1].strftime("%Y-%m-%d %H:%M:%S"), 
+        'start_date': d30_datetime.strftime("%Y-%m-%d %H:%M:%S") if t[1] == None else t[1].strftime("%Y-%m-%d %H:%M:%S"), 
         'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S") 
     } for t in turbines]
     
@@ -51,7 +51,7 @@ def process_turbines(turbines):
             last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
             if (isinstance(last_windturbine_log_date, str)):
                 # Update Windturbine last scada update records
-                
+                #essayer une seule requete update 
                 last_windturbine_log_datetime = datetime.strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S") + timedelta(minutes=10)
                 
                 stmt = (update(windturbines).
