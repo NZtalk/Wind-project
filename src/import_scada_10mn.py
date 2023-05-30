@@ -1,6 +1,5 @@
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
-import os
 from dotenv import load_dotenv
 from classes.WindAPI import *
 from datetime import datetime, timedelta
@@ -29,23 +28,16 @@ def process_turbines(turbines):
     # Payload for API Scada multi-thread call
     payload = []
     
-    d30_datetime = datetime.now() - timedelta(days=30)
+    d90_datetime = datetime.now() - timedelta(days=90)
     tz = pytz.timezone('Europe/Paris')
     current_datetime = datetime.now(tz)
     
-    for turbine in turbines:
-        last_scada_update = turbine[1]
-        # Default start date to D-30
-        if (last_scada_update == None):
-            start_date = d30_datetime
-        else:
-            start_date = last_scada_update
-            
-        payload.append({
-            'windturbine_id': turbine[0],
-            'start_date': start_date.strftime("%Y-%m-%d %H:%M:%S"),
-            'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        })
+    # Payload construction for API Request with list comprehension
+    payload = [{
+        'windturbine_id': t[0], 
+        'start_date': d90_datetime.strftime("%Y-%m-%d %H:%M:%S") if t[1] == None else t[1].strftime("%Y-%m-%d %H:%M:%S"), 
+        'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S") 
+    } for t in turbines]
     
     # SCADA API Request with payload
     scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
@@ -59,12 +51,12 @@ def process_turbines(turbines):
             last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
             if (isinstance(last_windturbine_log_date, str)):
                 # Update Windturbine last scada update records
-                last_windturbine_log_datetime = (datetime.
-                                                strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S").
-                                                strftime('%Y-%m-%d %H:%M:%S'))
+                
+                last_windturbine_log_datetime = datetime.strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S") + timedelta(minutes=10)
+                
                 stmt = (update(windturbines).
                         where(windturbines.c.windturbine_id == windturbine_id).
-                        values(last_scada_update=last_windturbine_log_datetime))
+                        values(last_scada_update=last_windturbine_log_datetime.strftime('%Y-%m-%d %H:%M:%S')))
                 with Session(eng) as session:
                     session.execute(stmt)
                     session.commit()
