@@ -1,14 +1,7 @@
-import pymongo
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import requests
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, select, update, bindparam
-from sqlalchemy.orm import sessionmaker, Session
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import select, update
+from sqlalchemy.orm import Session
 import os
 from dotenv import load_dotenv
-from sqlalchemy import text
-import mysql.connector
-from mysql.connector import Error
 from classes.WindAPI import *
 from datetime import datetime, timedelta
 from create_ref_mongodb import mongodb_connection
@@ -47,20 +40,24 @@ def process_turbines(turbines):
     payload = []
     
     d30_datetime = datetime.now() - timedelta(days=30)
-    current_datetime = datetime.now()
+    tz = pytz.timezone('Europe/Paris')
+    current_datetime = datetime.now(tz)
     
     for turbine in turbines:
         last_scada_update = turbine[1]
         # Default start date to D-30
         if (last_scada_update == None):
-            last_scada_update = d30_datetime
+            start_date = d30_datetime
+        else:
+            start_date = last_scada_update
             
         payload.append({
             'windturbine_id': turbine[0],
-            'start_date': last_scada_update.strftime("%Y-%m-%d %H:%M:%S"),
+            'start_date': start_date.strftime("%Y-%m-%d %H:%M:%S"),
             'end_date': current_datetime.strftime("%Y-%m-%d %H:%M:%S")
         })
     
+    # SCADA API Request with payload
     scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
     df_scada = scada_api.multithread_get(payload)
     
@@ -74,7 +71,7 @@ def process_turbines(turbines):
                 # Update Windturbine last scada update records
                 last_windturbine_log_datetime = (datetime.
                                                 strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S").
-                                                astimezone(pytz.timezone('Europe/Paris')).strftime('%Y-%m-%d %H:%M:%S'))
+                                                strftime('%Y-%m-%d %H:%M:%S'))
                 stmt = (update(windturbines).
                         where(windturbines.c.windturbine_id == windturbine_id).
                         values(last_scada_update=last_windturbine_log_datetime))
@@ -85,6 +82,6 @@ def process_turbines(turbines):
     return len(df_scada.index)
 
 
-# Traitement des données SCADA
+# Process SCADA DATA
 total_processed = process_scada_data()
 print(f"Total data SCADA processed: {total_processed}")
