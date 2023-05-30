@@ -10,16 +10,6 @@ import pytz
 # Charger les variables d'environnement à partir du fichier .env
 load_dotenv()
 
-# Récupérer les informations de connexion à partir des variables d'environnement
-mongodb_username = os.getenv("MONGO_ROOT_USERNAME")
-mongodb_password = os.getenv("MONGO_ROOT_PASSWORD")
-mongodb_database = os.getenv("MONGO_DATABASE")
-
-mariadb_user = os.getenv("MARIADB_USER")
-mariadb_root_password = os.getenv("MARIADB_ROOT_PASSWORD")
-mariadb_database = os.getenv("MARIADB_DATABASE")
-mariadb_password = os.getenv("MARIADB_PASSWORD")
-
 client = mongodb_connection()
 eng = mariadb_connection()
 
