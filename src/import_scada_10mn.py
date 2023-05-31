@@ -1,4 +1,4 @@
-from sqlalchemy import select, update
+from sqlalchemy import select, update, bindparam
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
 from classes.WindAPI import *
@@ -26,13 +26,13 @@ def validate_input_data(windturbine_id, last_scada_update):
     
 def process_scada_data():
     try:
-    # Récupérer les identifiants et last scada update de turbines depuis la table windturbine dans MariaDB
+        # Récupérer les identifiants et last scada update de turbines depuis la table windturbine dans MariaDB
         stmt = select(windturbines.c['windturbine_id','last_scada_update'])
         turbines = []
         with Session(eng) as session:
             for row in session.execute(stmt):
-             turbines.append(row)
-             logging.info("Récupération des turbines depuis la base de données réussie.")
+                turbines.append(row)
+            logging.info("Récupération de {} turbines dans la base MariaDB".format(len(turbines)))
 
              # Traiter les données SCADA pour chaque turbine
             for turbine in turbines:
@@ -48,7 +48,7 @@ def process_turbines(turbines):
         # Payload for API Scada multi-thread call
         payload = []
     
-        d30_datetime = datetime.now() - timedelta(days=30)
+        d30_datetime = datetime.now() - timedelta(days=10)
         tz = pytz.timezone('Europe/Paris')
         current_datetime = datetime.now(tz)
     
@@ -66,21 +66,32 @@ def process_turbines(turbines):
         if (df_scada.empty == False):
             # Insert rows in MongoDB collection
             client["scada"].insert_many(df_scada.to_dict('records'))
+            logging.info("Insertion des données SCADA dans la collection MongoDB réussie.")
+            
+            params = []
             for turbine in turbines:
                 windturbine_id = turbine[0]
                 last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
                 if (isinstance(last_windturbine_log_date, str)):
                     # Update Windturbine last scada update records
                     last_windturbine_log_datetime = datetime.strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S") + timedelta(minutes=10)
-                    logging.info("Insertion des lignes dans la collection MongoDB réussie.")
-    
-                    stmt = (update(windturbines)
-                            .where(windturbines.c.windturbine_id == windturbine_id)
-                            .values(last_scada_update=last_windturbine_log_datetime.strftime('%Y-%m-%d %H:%M:%S')))
-                    with Session(eng) as session:
-                        session.execute(stmt)
-                        session.commit()
-        
+                    params.append({
+                        "id": windturbine_id,
+                        "last_update": last_windturbine_log_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                    })
+                    
+            stmt = (
+                update(windturbines)
+                .where(windturbines.c.windturbine_id == bindparam("id"))
+                .values(last_scada_update = bindparam("last_update"))
+            )
+            with Session(eng) as session:
+                result = session.execute(
+                    stmt, params
+                )
+                session.commit()
+                logging.info("Mise à jour de {} turbines dans la base MariaDB".format(result.rowcount))
+            
             return len(df_scada.index)
         else:
             return 0  # Aucune donnée SCADA traitée
