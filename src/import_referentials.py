@@ -24,10 +24,6 @@ def add_geo_farms(df_farms,df_turbines):
     df = pd.merge(df_farms,df_farms_geo,on="windfarm_id",how="inner")
     return(df)
 
-
-
-
-
 if __name__ == "__main__":
     load_dotenv()
     user=os.environ["MARIADB_USER"]
@@ -60,7 +56,6 @@ if __name__ == "__main__":
     list_payload = df_turbines[['windturbine_id']].drop_duplicates().to_dict('records')
     df_powercurves = get_turbines_powercurves(url_powercurves,list_payload)
 
-    
     #insert to sql
     df_farms.to_sql('windfarms',con=eng,if_exists = 'append',index=false)
     df_turbines.to_sql('windturbines',con=eng,if_exists = 'append',index=false)
