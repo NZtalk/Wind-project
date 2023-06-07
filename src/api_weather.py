@@ -28,6 +28,7 @@ class ForecastWeatherAPI:
         """
         list_responses = []
         dict = {}
+        #Iterating on winfarm_id
         for index, row in df.iterrows():
             windfarm_id = row["windfarm_id"]
             lat = row["latitude"]
@@ -35,8 +36,15 @@ class ForecastWeatherAPI:
             response = requests.get("{}?lat={}&lon={}&appid={}"
                                     .format(self.url, lat, lon, self.key ))
             data = response.json()
+            # Converting text to datetime format
+            if self.url[-8:] == "forecast": 
+                for elem in data["list"]:
+                    elem["dt_txt"] = datetime.strptime(elem["dt_txt"],"%Y-%m-%d %H:%M:%S")
+            else :
+                data["dt"] = datetime.fromtimestamp(data["dt"])
             data["windfarm_id"] = windfarm_id
             list_responses.append(data)
-        dict["extract_date"] = datetime.now().strftime("%m-%d-%Y %H:%M:%S")
+        dict["extract_date"] = datetime.now()
         dict["data"]= list_responses
         return dict
+    

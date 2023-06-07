@@ -25,7 +25,7 @@ if __name__ == "__main__":
     con=eng
     )
     
-    add_forecast_to_mongodb(url_current, sql_df)
+    add_forecast_to_mongodb(url_forecast, sql_df)
     print("Forecast data imported.")
 
     add_current_to_mongodb(url_current, sql_df)
