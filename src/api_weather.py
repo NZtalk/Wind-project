@@ -33,7 +33,7 @@ class ForecastWeatherAPI:
             windfarm_id = row["windfarm_id"]
             lat = row["latitude"]
             lon = row["longitude"]
-            response = requests.get("{}?lat={}&lon={}&appid={}"
+            response = requests.get("{}?lat={}&lon={}&appid={}&units=metric"
                                     .format(self.url, lat, lon, self.key ))
             data = response.json()
             # Converting text to datetime format
