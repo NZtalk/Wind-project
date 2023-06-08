@@ -82,11 +82,29 @@ class DataModel(BaseModel):
     dt: Optional[int]
     sys: Optional[SysModel]
     windfarm_id: Optional[str]
+    name: Optional[str]
 
 class MongoDBResponse(BaseModel):
     id: Optional[str] = Field(..., alias="id")
     extract_date: Optional[str]
     data: Optional[List[DataModel]]
+
+class ForecastDataModel(BaseModel):
+    coord: Optional[CoordModel]
+    weather: Optional[List[WeatherModel]]
+    main: Optional[MainModel]
+    wind: Optional[WindModel]
+    clouds: Optional[CloudsModel]
+    dt: Optional[int]
+    sys: Optional[SysModel]
+    windfarm_id: Optional[str]
+    name: Optional[str]
+    
+
+class ForescastModel(BaseModel):
+    id: Optional[str] = Field(..., alias="id")
+    extract_date: Optional[str]
+    data: Optional[List[ForecastDataModel]]
 
 def convert_objectid(obj):
     if isinstance(obj, ObjectId):
@@ -106,7 +124,7 @@ def get_mongodb_current():
 def get_mongodb_current():
     collection = mongodb_connection()["forecast"]
     data = list(collection.find())
-    converted_data = [MongoModel(**{**item, 'id': convert_objectid(item["_id"])}) for item in data]
+    converted_data = [ForescastModel(**{**item, 'id': convert_objectid(item["_id"])}) for item in data]
     return JSONResponse(content=jsonable_encoder(converted_data))
 
 @app.get("/mongodb/scada")
