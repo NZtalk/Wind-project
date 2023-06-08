@@ -7,11 +7,13 @@ client = mongodb_connection()
 eng = mariadb_connection()
 
 def add_forecast_to_mongodb(url: str, df: pd.DataFrame):
+    client["forecast"].drop()
     api = ForecastWeatherAPI(url)
     data = api.get_data(df)
     client["forecast"].insert_one(data)
 
 def add_current_to_mongodb(url: str, df: pd.DataFrame):
+    client["current"].drop()
     api = ForecastWeatherAPI(url)
     data = api.get_data(df)
     client["current"].insert_one(data)
@@ -25,7 +27,7 @@ if __name__ == "__main__":
     con=eng
     )
     
-    add_forecast_to_mongodb(url_current, sql_df)
+    add_forecast_to_mongodb(url_forecast, sql_df)
     print("Forecast data imported.")
 
     add_current_to_mongodb(url_current, sql_df)

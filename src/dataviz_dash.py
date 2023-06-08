@@ -14,7 +14,7 @@ app.title = 'Dashboard'
 
 app.layout = html.Div([
   html.H1('MAP'),
-  html.Iframe(id='map',srcDoc=open('src/index.html','r').read(),width='100%',height='600')]
+  html.Iframe(id='map',srcDoc=open('map.html','r').read(),width='100%',height='600')]
 )
 if __name__ == '__main__' :
     app.run_server(debug=True, host='0.0.0.0')

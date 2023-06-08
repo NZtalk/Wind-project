@@ -4092,6 +4092,19 @@ docs = ["Sphinx (>=4.1.2,<4.2.0)", "sphinx-rtd-theme (>=0.5.2,<0.6.0)", "sphinxc
 test = ["Cython (>=0.29.32,<0.30.0)", "aiohttp", "flake8 (>=3.9.2,<3.10.0)", "mypy (>=0.800)", "psutil", "pyOpenSSL (>=22.0.0,<22.1.0)", "pycodestyle (>=2.7.0,<2.8.0)"]
 
 [[package]]
+name = "vincent"
+version = "0.4.4"
+description = "A Python to Vega translator"
+optional = false
+python-versions = "*"
+files = [
+    {file = "vincent-0.4.4.tar.gz", hash = "sha256:5765bcd360140d2304e52728ad1d4382f3f919ea259a13932828680f2d84fcd3"},
+]
+
+[package.dependencies]
+pandas = "*"
+
+[[package]]
 name = "virtualenv"
 version = "20.23.0"
 description = "Virtual Python Environment builder"
@@ -4407,4 +4420,4 @@ testing = ["big-O", "flake8 (<5)", "jaraco.functools", "jaraco.itertools", "more
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11"
-content-hash = "22ca81a11af81d524d3f2f92aed064cb1a118dbad8e8679b86d3134d0a219710"
+content-hash = "d67bbcb6198700422145c49eb119436177b61826ed69a5e12f54ff79d17765e5"
