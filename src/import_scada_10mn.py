@@ -7,6 +7,8 @@ from create_ref_mongodb import mongodb_connection
 from create_ref_mariadb import mariadb_connection, windturbines
 import pytz
 import logging
+from pandas import to_datetime
+from pandas.api.types import is_datetime64_any_dtype as is_datetime
 
 # Charger les variables d'environnement à partir du fichier .env
 load_dotenv()
@@ -26,9 +28,9 @@ def import_scada_data(turbines, client_mongo):
     # Payload for API Scada multi-thread call
     payload = []
 
-    d30_datetime = datetime.now() - timedelta(days=10)
     tz = pytz.timezone('Europe/Paris')
     current_datetime = datetime.now(tz)
+    d30_datetime = current_datetime - timedelta(days=30)
 
     # Payload construction for API Request with list comprehension
     payload = [{
@@ -40,6 +42,13 @@ def import_scada_data(turbines, client_mongo):
     # SCADA API Request with payload
     scada_api = WindAPI("https://api-staging.anavelbraz.app:8443/api/public/dst/fetch-scada-data")
     df_scada = scada_api.multithread_get(payload)
+    types_dict = {}
+    for c in df_scada.columns:
+        if c not in ['windturbine_id', 'wind_turbine', 'log_date'] :
+            types_dict[c] = 'float'
+        
+    df_scada = df_scada.astype(types_dict)
+    df_scada['log_date'] = to_datetime(df_scada['log_date'], utc=True)
 
     if (df_scada.empty == False):
         # Insert rows in MongoDB collection
@@ -49,18 +58,19 @@ def import_scada_data(turbines, client_mongo):
 
 def update_windturbines_scada(turbines, df_scada, engine):
             
+    timezone = pytz.timezone("Europe/Paris")
     params = []
     for turbine in turbines:
         windturbine_id = turbine[0]
         last_windturbine_log_date = df_scada[df_scada['wind_turbine'] == windturbine_id]['log_date'].max()
-        if (isinstance(last_windturbine_log_date, str)):
+        if (pd.isnull(last_windturbine_log_date) == False):
             # Update Windturbine last scada update records
-            last_windturbine_log_datetime = datetime.strptime(last_windturbine_log_date[:-3], "%Y-%m-%d %H:%M:%S") + timedelta(minutes=10)
+            last_windturbine_log_date = last_windturbine_log_date.tz_convert(timezone) + timedelta(minutes=10)
             params.append({
                 "id": windturbine_id,
-                "last_update": last_windturbine_log_datetime.strftime('%Y-%m-%d %H:%M:%S')
+                "last_update": last_windturbine_log_date.strftime('%Y-%m-%d %H:%M:%S')
             })
-            
+    
     stmt = (
         update(windturbines)
         .where(windturbines.c.windturbine_id == bindparam("id"))
