@@ -1,0 +1,1 @@
+10 * * * * /usr/local/bin/python /app/src/import_scada_10mn.py
