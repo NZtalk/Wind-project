@@ -13,7 +13,10 @@ from typing import List, Optional
 from bson import ObjectId
 import json
 import requests
-from sqlalchemy.dialects.mysql import WKBElement
+from sqlalchemy.dialects import mysql
+from sqlalchemy.types import TypeDecorator
+import httpx
+
 
 app = FastAPI()
 
@@ -134,7 +137,8 @@ class CustomJSONEncoder(json.JSONEncoder):
             return str(obj)
         return super().default(obj)
     
-
+class WKBElement(TypeDecorator):
+    impl = mysql.MEDIUMBLOB
    
 # Routes MongoDB
 
@@ -200,41 +204,114 @@ def get_mongodb_scada(limit: int = 20, offset: int = 0):
 
 
 # Routes MariaDB
-@app.get("/mariadb/powercurves")
-def get_mariadb_powercurves():
-    with eng.connect() as connection:
-        query = text("SELECT * FROM powercurves")
-        result = connection.execute(query)
-        data = [dict(row) for row in result]
 
-        encoded_data = jsonable_encoder(data, custom_encoder={WKBElement: lambda _: None})
-    
-    return {"data": encoded_data}
+@app.get("/mariadb/powercurves")
+async def get_powercurves(page: int = 1, per_page: int = 10, all_data : bool =False):
+    # Calculate the OFFSET value based on the requested page and per_page values
+    if all_data:
+        offset = 0
+        limit = None  # No limit, retrieve all data
+    else:
+        offset = (page - 1) * per_page
+        limit = per_page
+
+    # Establish a connection to the database
+    with eng.connect() as conn:
+        
+        # Select a subset of data from the table using LIMIT and OFFSET
+        query = text("SELECT * FROM mariadb_itw.powercurves LIMIT :per_page OFFSET :offset;")
+        result = conn.execute(query, {"per_page": per_page, "offset": offset})
+
+        # Fetch all rows from the result
+        rows = result.fetchall()
+
+        # Convert the rows to a list of dictionaries
+        data = []
+        for row in rows:
+                        
+            # Create a dictionary with windturbine_id, windspeed, and power
+            row_data = {
+                "windturbine_id": row.windturbine_id,
+                "windspeed": row.windspeed,
+                "power": row.power
+            }
+            data.append(row_data)
+
+    # Return the data as the response
+    return {"data": data}
+
+
 
 
 @app.get("/mariadb/windfarms")
-def get_mariadb_windfarms():
-    with eng.connect() as connection:
-        result = connection.execute("SELECT * FROM windfarms")
-        data = result.fetchall()
-    return {"data": data}
+async def get_windfarms(page: int =1, per_page: int =10, all_data: bool = False):
+
+    if all_data:
+        offeset= 0
+        limit = None
+    else:
+        offset = (page - 1) * per_page
+        limit = per_page
+
+    with eng.connect() as conn:
+        query = text("SELECT * FROM mariadb_itw.windfarms LIMIT :limit OFFSET :offset;")
+        result = conn.execute(query, {"limit": limit, "offset": offset})
+
+        rows = result.fetchall()
+
+        data=[]
+        for row in rows:
+            row_data = {
+                "windfarm_id": row.windfarm_id,
+                "code": row.code,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "last_meteo_update": row.last_meteo_update
+            }
+            data.append(row_data)
+    return {"data":data}
 
 @app.get("/mariadb/windturbines")
-def get_mariadb_windturbines():
-    with eng.connect() as connection:
-        result = connection.execute("SELECT * FROM windturbines")
-        data = result.fetchall()
+async def get_windturbines(page: int =1, per_page: int =10, all_data: bool = False):
+    if all_data:
+        offset = 0
+        limit = None
+    else:
+        offset = (page -1) * per_page
+        limit = per_page
+        
+    with eng.connect() as conn:
+        query = text("SELECT * FROM mariadb_itw.windturbines LIMIT :limit OFFSET :offset;")
+        result = conn.execute(query, {"limit": limit, "offset": offset})
+
+        rows = result.fetchall()
+
+        data= []
+        for row in rows:
+            row_data = {
+                "windturbine_id": row.windturbine_id,
+                "windfarm_id": row.windfarm_id,
+                "code": row.code,
+                "latitude": row.latitude,
+                "longitude": row.longitude,
+                "last_scada_update": row.last_scada_update
+            }
+            data.append(row_data)
     return {"data": data}
 
+@api.get("/ping")
+async def ping():
+    """Vérifie que l'API est fonctionnelle."""
+    return {"message": "API is functional."}
+
+
 @app.get("/api/endpoint")
-def get_api_data():
-    response = requests.get('https://votre-api.com/endpoint')
+async def get_api_data():
+    response = requests.get('http://127.0.0.1:8000')
 
     if response.status_code == 200:
         data = response.json()
         converted_data = JSONResponse(content=jsonable_encoder(data))
         return converted_data
-
     else:
         raise HTTPException(status_code=response.status_code, detail=f"La requête API a échoué avec le code {response.status_code}")
-
