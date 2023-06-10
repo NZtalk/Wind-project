@@ -21,7 +21,6 @@ def fetch_windturbines_data(engine):
         for row in session.execute(stmt):
             turbines.append(row)
 
-    # Traiter les données SCADA pour chaque turbine
     return turbines
 
 def import_scada_data(turbines, client_mongo):
