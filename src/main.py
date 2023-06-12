@@ -15,6 +15,8 @@ import json
 import requests
 from sqlalchemy.dialects import mysql
 from sqlalchemy.types import TypeDecorator
+from sqlalchemy.exc import IntegrityError
+import math
 
 
 
@@ -137,8 +139,10 @@ class CustomJSONEncoder(json.JSONEncoder):
             return str(obj)
         return super().default(obj)
     
-class WKBElement(TypeDecorator):
-    impl = mysql.MEDIUMBLOB
+class PowerCurve(BaseModel):
+    windturbine_id : str
+    windspeed : int
+    power: int
    
 # Routes MongoDB
 
@@ -178,6 +182,8 @@ def get_mongodb_forecast(limit: int = 20, offset: int = 0):
     return Response(content=content, headers=headers)
 
 
+
+
 @app.get("/mongodb/scada")
 def get_mongodb_scada(limit: int = 20, offset: int = 0):
     collection = mongodb_connection()["scada"]
@@ -195,6 +201,8 @@ def get_mongodb_scada(limit: int = 20, offset: int = 0):
                 converted_item[key] = str(value)
             elif isinstance(value, dict):
                 converted_item[key] = {sub_key: convert_objectid(sub_value) for sub_key, sub_value in value.items()}
+            elif isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+                converted_item[key] = None  # Replace NaN or infinite value with None or a string representation
             else:
                 converted_item[key] = value
         converted_data.append(converted_item)
@@ -240,9 +248,95 @@ async def get_powercurves(page: int = 1, per_page: int = 10, all_data : bool =Fa
     # Return the data as the response
     return {"data": data}
 
+@app.post("/powercurves")
+async def create_powercurves(powercurve: PowerCurve):
+    # Extract the data from the PowerCurveSchema object
+    windturbine_id = powercurve.windturbine_id
+    windspeed = powercurve.windspeed
+    power = powercurve.power
+
+    # Check if the windturbine_id exists in the windturbines table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        result = conn.execute(query, {"windturbine_id": windturbine_id})
+        if result.scalar() == 0:
+            # Wind turbine does not exist, create a new entry
+            query = text("INSERT INTO windturbines (windturbine_id) VALUES (:windturbine_id)")
+            try:
+                conn.execute(query, {"windturbine_id": windturbine_id})
+                conn.commit()
+            except IntegrityError:
+                raise HTTPException(status_code=500, detail="Failed to create wind turbine")
+
+        # Check if the windturbine_id already exists in the powercurves table
+        query = text("SELECT COUNT(*) FROM powercurves WHERE windturbine_id = :windturbine_id AND windspeed = :windspeed")
+        result = conn.execute(query, {"windturbine_id": windturbine_id, "windspeed": windspeed})
+        if result.scalar() > 0:
+            raise HTTPException(status_code=409, detail="Winturbine_id already exists")
+
+        # Insert the power curve into the powercurves table
+        query = text("INSERT INTO powercurves (windturbine_id, windspeed, power) VALUES (:windturbine_id, :windspeed, :power)")
+        try:
+            conn.execute(query, {"windturbine_id": windturbine_id, "windspeed": windspeed, "power": power})
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Return the created powercurve data
+    return {"windturbine_id": windturbine_id, "windspeed": windspeed, "power": power}
 
 
+@app.put('/powercurves')
+async def update_powercurves(powercurve: PowerCurve):
+    # Extract the data from the PowerCurveSchema object
+    windturbine_id = powercurve.windturbine_id
+    windspeed = powercurve.windspeed
+    power = powercurve.power
 
+    # Check if the windturbine_id exists in the windturbines table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        result = conn.execute(query, {"windturbine_id": windturbine_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windturbine not found")
+
+        # Update the power curve in the powercurves table
+        query = text("UPDATE powercurves SET power = :power, windspeed= :windspeed WHERE windturbine_id = :windturbine_id")
+        try:
+            conn.execute(query, {"windturbine_id": windturbine_id, "windspeed": windspeed, "power": power})
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Return the updated powercurve data
+    return {"windturbine_id": windturbine_id, "windspeed": windspeed, "power": power}
+
+@app.delete('/powercurves')
+async def delete_powercurves(windturbine_id: str):
+    # Check if the windturbine_id exists in the windturbines table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        result = conn.execute(query, {"windturbine_id": windturbine_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windturbine not found")
+
+    # Delete the power curves with the specified windturbine_id
+    with eng.connect() as conn:
+        query = text("DELETE FROM powercurves WHERE windturbine_id = :windturbine_id")
+        try:
+            result = conn.execute(query, {"windturbine_id": windturbine_id})
+            deleted_count = result.rowcount
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail=" Data  in Powercurves not found")
+
+    # Return success message
+    return {"message": f"All data in powercurves with windturbine_id {windturbine_id} deleted successfully"}
+
+   
 @app.get("/mariadb/windfarms")
 async def get_windfarms(page: int =1, per_page: int =10, all_data: bool = False):
 
