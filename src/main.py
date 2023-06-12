@@ -15,7 +15,7 @@ import json
 import requests
 from sqlalchemy.dialects import mysql
 from sqlalchemy.types import TypeDecorator
-import httpx
+
 
 
 app = FastAPI()
@@ -299,7 +299,7 @@ async def get_windturbines(page: int =1, per_page: int =10, all_data: bool = Fal
             data.append(row_data)
     return {"data": data}
 
-@api.get("/ping")
+@app.get("/ping")
 async def ping():
     """Vérifie que l'API est fonctionnelle."""
     return {"message": "API is functional."}
