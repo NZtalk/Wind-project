@@ -143,6 +143,22 @@ class PowerCurve(BaseModel):
     windturbine_id : str
     windspeed : int
     power: int
+
+class WindTurbine(BaseModel):
+    windturbine_id : str
+    windfarm_id : str
+    code: str
+    latitude : float
+    longitude : float
+    last_scada_update: datetime
+
+class WindFarm(BaseModel):
+    windfarm_id : str
+    code : str
+    latitude : float
+    longitude: float
+    last_meteo_update : datetime
+
    
 # Routes MongoDB
 
@@ -250,7 +266,7 @@ async def get_powercurves(page: int = 1, per_page: int = 10, all_data : bool =Fa
 
 @app.post("/powercurves")
 async def create_powercurves(powercurve: PowerCurve):
-    # Extract the data from the PowerCurveSchema object
+    # Extract the data from the PowerCurve Schema object
     windturbine_id = powercurve.windturbine_id
     windspeed = powercurve.windspeed
     power = powercurve.power
@@ -288,7 +304,7 @@ async def create_powercurves(powercurve: PowerCurve):
 
 @app.put('/powercurves')
 async def update_powercurves(powercurve: PowerCurve):
-    # Extract the data from the PowerCurveSchema object
+    # Extract the data from the PowerCurve Schema object
     windturbine_id = powercurve.windturbine_id
     windspeed = powercurve.windspeed
     power = powercurve.power
@@ -315,12 +331,12 @@ async def update_powercurves(powercurve: PowerCurve):
 async def delete_powercurves(windturbine_id: str):
     # Check if the windturbine_id exists in the windturbines table
     with eng.connect() as conn:
-        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        query = text("SELECT COUNT(*) FROM powercurves WHERE windturbine_id = :windturbine_id")
         result = conn.execute(query, {"windturbine_id": windturbine_id})
         if result.scalar() == 0:
             raise HTTPException(status_code=404, detail="Windturbine not found")
 
-    # Delete the power curves with the specified windturbine_id
+    # Delete the powercurves with the specified windturbine_id
     with eng.connect() as conn:
         query = text("DELETE FROM powercurves WHERE windturbine_id = :windturbine_id")
         try:
@@ -365,6 +381,88 @@ async def get_windfarms(page: int =1, per_page: int =10, all_data: bool = False)
             data.append(row_data)
     return {"data":data}
 
+@app.post("/windfarms")
+async def create_windfarm(windfarm: WindFarm):
+    # Extract the data from the WindFarm Schema object
+    windfarm_id = windfarm.windfarm_id
+    code = windfarm.code
+    latitude = windfarm.latitude
+    longitude = windfarm.longitude
+    last_meteo_update = windfarm.last_meteo_update
+
+    # Insert the windfarm into the windfarms table
+    query = text("INSERT INTO windfarms (windfarm_id, code, latitude, longitude, last_meteo_update) "
+                 "VALUES (:windfarm_id, :code, :latitude, :longitude, :last_meteo_update)")
+    try:
+        with eng.connect() as conn:
+            conn.execute(query, {"windfarm_id": windfarm_id, "code": code, "latitude": latitude,
+                                 "longitude": longitude, "last_meteo_update": last_meteo_update})
+            conn.commit()
+    except IntegrityError:
+        raise HTTPException(status_code=500, detail="Failed to create wind farm")
+
+    # Return the created windfarm data
+    return {"windfarm_id": windfarm_id, "code": code, "latitude": latitude,
+            "longitude": longitude, "last_meteo_update": last_meteo_update}
+
+
+@app.put('/windfarms')
+async def update_windfarm(windfarm: WindFarm):
+    # Extract the data from the WindFarmSchema object
+    windfarm_id = windfarm.windfarm_id
+    code = windfarm.code
+    latitude = windfarm.latitude
+    longitude = windfarm.longitude
+    last_meteo_update = windfarm.last_meteo_update
+
+    # Check if the windfarm_id exists in the windfarms table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windfarms WHERE windfarm_id = :windfarm_id")
+        result = conn.execute(query, {"windfarm_id": windfarm_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windfarm not found")
+
+        # Update the windfarm in the windfarms table
+        query = text("UPDATE windfarms SET code = :code, latitude = :latitude, longitude = :longitude, "
+                     "last_meteo_update = :last_meteo_update WHERE windfarm_id = :windfarm_id")
+        try:
+            conn.execute(query, {"windfarm_id": windfarm_id, "code": code, "latitude": latitude,
+                                 "longitude": longitude, "last_meteo_update": last_meteo_update})
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Return the updated windfarm data
+    return {"windfarm_id": windfarm_id, "code": code, "latitude": latitude,
+            "longitude": longitude, "last_meteo_update": last_meteo_update}
+
+
+@app.delete('/windfarms')
+async def delete_windfarm(windfarm_id: str):
+    # Check if the windfarm_id exists in the windfarms table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windfarms WHERE windfarm_id = :windfarm_id")
+        result = conn.execute(query, {"windfarm_id": windfarm_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windfarm not found")
+
+    # Delete the windfarm with the specified windfarm_id
+    with eng.connect() as conn:
+        query = text("DELETE FROM windfarms WHERE windfarm_id = :windfarm_id")
+        try:
+            result = conn.execute(query, {"windfarm_id": windfarm_id})
+            deleted_count = result.rowcount
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Data in Windfarms not found")
+
+    # Return success message
+    return {"message": f"All data in windfarms with windfarm_id {windfarm_id} deleted successfully"}
+
+
 @app.get("/mariadb/windturbines")
 async def get_windturbines(page: int =1, per_page: int =10, all_data: bool = False):
     if all_data:
@@ -393,19 +491,115 @@ async def get_windturbines(page: int =1, per_page: int =10, all_data: bool = Fal
             data.append(row_data)
     return {"data": data}
 
+@app.post("/windturbines")
+async def create_windturbine(windturbine: WindTurbine):
+    # Extract the data from the WindTurbineSchema object
+    windturbine_id = windturbine.windturbine_id
+    windfarm_id = windturbine.windfarm_id
+    code = windturbine.code
+    latitude = windturbine.latitude
+    longitude = windturbine.longitude
+    last_scada_update = windturbine.last_scada_update
+
+    # Check if the windfarm_id exists in the windfarms table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windfarms WHERE windfarm_id = :windfarm_id")
+        result = conn.execute(query, {"windfarm_id": windfarm_id})
+        if result.scalar() == 0:
+            # Wind farm does not exist, create a new entry
+            query = text("INSERT INTO windfarms (windfarm_id) VALUES (:windfarm_id)")
+            try:
+                conn.execute(query, {"windfarm_id": windfarm_id})
+                conn.commit()
+            except IntegrityError:
+                raise HTTPException(status_code=500, detail="Failed to create wind farm")
+
+        # Insert the windturbine into the windturbines table
+        query = text("INSERT INTO windturbines (windturbine_id, windfarm_id, code, latitude, longitude, last_scada_update) "
+                     "VALUES (:windturbine_id, :windfarm_id, :code, :latitude, :longitude, :last_scada_update)")
+        try:
+            conn.execute(query, {"windturbine_id": windturbine_id, "windfarm_id": windfarm_id, "code": code,
+                                 "latitude": latitude, "longitude": longitude, "last_scada_update": last_scada_update})
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Failed to create wind turbine")
+
+    # Return the created windturbine data
+    return {"windturbine_id": windturbine_id, "windfarm_id": windfarm_id, "code": code,
+            "latitude": latitude, "longitude": longitude, "last_scada_update": last_scada_update}
+
+
+
+@app.put('/windturbines')
+async def update_windturbine(windturbine: WindTurbine):
+    # Extract the data from the WindTurbineSchema object
+    windturbine_id = windturbine.windturbine_id
+    windfarm_id = windturbine.windfarm_id
+    code = windturbine.code
+    latitude = windturbine.latitude
+    longitude = windturbine.longitude
+    last_scada_update = windturbine.last_scada_update
+
+    # Check if the windturbine_id exists in the windturbines table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        result = conn.execute(query, {"windturbine_id": windturbine_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windturbine not found")
+
+        # Check if the windfarm_id exists in the windfarms table
+        query = text("SELECT COUNT(*) FROM windfarms WHERE windfarm_id = :windfarm_id")
+        result = conn.execute(query, {"windfarm_id": windfarm_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windfarm not found")
+
+        # Update the windturbine in the windturbines table
+        query = text("UPDATE windturbines SET windfarm_id = :windfarm_id, code = :code, latitude = :latitude, "
+                     "longitude = :longitude, last_scada_update = :last_scada_update "
+                     "WHERE windturbine_id = :windturbine_id")
+        try:
+            conn.execute(query, {"windturbine_id": windturbine_id, "windfarm_id": windfarm_id, "code": code,
+                                 "latitude": latitude, "longitude": longitude, "last_scada_update": last_scada_update})
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    # Return the updated windturbine data
+    return {"windturbine_id": windturbine_id, "windfarm_id": windfarm_id, "code": code,
+            "latitude": latitude, "longitude": longitude, "last_scada_update": last_scada_update}
+
+
+@app.delete('/windturbines')
+async def delete_windturbine(windturbine_id: str):
+    # Check if the windturbine_id exists in the windturbines table
+    with eng.connect() as conn:
+        query = text("SELECT COUNT(*) FROM windturbines WHERE windturbine_id = :windturbine_id")
+        result = conn.execute(query, {"windturbine_id": windturbine_id})
+        if result.scalar() == 0:
+            raise HTTPException(status_code=404, detail="Windturbine not found")
+
+    # Delete the windturbine with the specified windturbine_id
+    with eng.connect() as conn:
+        query = text("DELETE FROM windturbines WHERE windturbine_id = :windturbine_id")
+        try:
+            result = conn.execute(query, {"windturbine_id": windturbine_id})
+            deleted_count = result.rowcount
+            conn.commit()
+        except IntegrityError:
+            raise HTTPException(status_code=500, detail="Internal server error")
+
+    if deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Data in Windturbines not found")
+
+    # Return success message
+    return {"message": f"All data in windturbines with windturbine_id {windturbine_id} deleted successfully"}
+
+
+
+
 @app.get("/ping")
 async def ping():
     """Vérifie que l'API est fonctionnelle."""
     return {"message": "API is functional."}
 
 
-@app.get("/api/endpoint")
-async def get_api_data():
-    response = requests.get('http://127.0.0.1:8000')
-
-    if response.status_code == 200:
-        data = response.json()
-        converted_data = JSONResponse(content=jsonable_encoder(data))
-        return converted_data
-    else:
-        raise HTTPException(status_code=response.status_code, detail=f"La requête API a échoué avec le code {response.status_code}")
