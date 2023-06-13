@@ -6,7 +6,7 @@ import pymongo
 from datetime import datetime, timedelta
 
 
-def last_forecast_weather_to_df(client) -> pd.DataFrame:
+def last_forecast_weather_to_df(client):
     # Get the last update
     last_forcast_update = client.forecast.find({}, {"data" : 1}).sort("extract_date", -1).limit(1)
     last_forcast_update = list(last_forcast_update)[0]["data"]
@@ -17,17 +17,17 @@ def last_forecast_weather_to_df(client) -> pd.DataFrame:
         for forecast in windfarm["list"]:
             dict_forecast = {}
             for key, value in forecast.items():
-                if key == "dt_txt":
-                    dict_forecast["forecast_date"] = value
-                elif key == "wind":
-                    dict_forecast["windspeed"] = value["speed"]
-                else :
-                    continue
+                dict_forecast[key] = forecast[key]
             dict_forecast["windfarm_id"] = windfarm["windfarm_id"]
             list_data.append(dict_forecast)
 
     # Transform list in to DataFrame
-    df = pd.DataFrame(list_data)
+    dict_rename = {"main.temp": "temp", "main.feels_like": "feels_like", "main.temp_min": "temp_min", "main.temp_max": "temp_max",
+                    "main.pressure": "pressure", "main.humidity": "humidity", "wind.speed": "wind_speed", "wind.deg": "wind_deg", 
+                    "wind.gust": "wind_gust", "dt_txt": "forecast_date", "main.temp_kf": "temp_kf", "clouds.all": "clouds"}
+    df = pd.json_normalize(list_data)\
+    .drop(["weather", "pop", "dt", "visibility", "sys.pod", "main.sea_level", "main.grnd_level"], axis = 1)\
+    .rename(dict_rename, axis = "columns")
     return df
 
 def current_weather_to_df(client) -> pd.DataFrame:
@@ -62,7 +62,7 @@ def forecast_power_by_turbine(df_forecast_weather: pd.DataFrame, df_power_curve:
     # Get estimated power for the 5-next days based on forecast wind and powercurve
     df_final = pd.DataFrame()
     for index, row in df_forecast_weather.iterrows():
-        df = df_power_curve[(df_power_curve["windfarm_id"] == row["windfarm_id"]) & (df_power_curve["windspeed"] == round(row["windspeed"], 1))]
+        df = df_power_curve[(df_power_curve["windfarm_id"] == row["windfarm_id"]) & (df_power_curve["windspeed"] == round(row["wind_speed"], 1))]
         df_copy = df.copy()
         df_copy.loc[:,"forecast_date"] = row["forecast_date"]
         df_final = pd.concat([df_final, df_copy])
@@ -82,3 +82,12 @@ def max_power_by_turbine(eng) -> pd.DataFrame:
         con=eng
         )
     return df_max_power
+
+
+if __name__ == "__main__":
+    client = mongodb_connection()
+    eng = mariadb_connection()
+    df_fw = last_forecast_weather_to_df(client)
+    df_pc = power_curve(eng)
+    df_fp = forecast_power_by_turbine(df_fw, df_pc)
+    print(df_fp.head())
