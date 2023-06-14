@@ -5,27 +5,15 @@ import plotly.express as px
 from from_db_to_df import *
 import copy
 import json
+from datetime import datetime, timedelta
 
-# Definition of needed materials
-client = mongodb_connection()
-eng = mariadb_connection()
-
-df_forecast_weather = last_forecast_weather_to_df(client)
-df_power_curve = power_curve(eng)
-df_power_forecast = forecast_power_by_turbine(df_forecast_weather, df_power_curve)
-df_wf_turbine = pd.read_sql(
-        """SELECT *
-            FROM mariadb_itw.windturbines;""",
-        con=eng
-        )
-
+# Template layout
 layout = dict(
     autosize=True,
     automargin=True,
-    margin=dict(l=30, r=30, b=20, t=40),
-    hovermode="closest",
+    margin=dict(l=30, r=30, b=20, t=30),
     plot_bgcolor="#F9F9F9",
-    paper_bgcolor="#F9F9F9",
+    paper_bgcolor="#F9F9F9", #251f1f
     legend=dict(font=dict(size=10), orientation="h"),
     title="Windfarms overview",
     mapbox=dict(
@@ -43,61 +31,58 @@ app = dash.Dash(__name__,
 app.title = "Into the Wind"
 
 # Map windfarms
-df = df_wf_turbine.groupby("windfarm_id")[["latitude", "longitude"]].mean()
-
-def create_map_windfarm():
-    df = df_wf_turbine.groupby("windfarm_id")[["latitude", "longitude"]].mean().reset_index()
-    trace = [dict(
-        type="scattermapbox",
-        lon=df["longitude"],
-        lat=df["latitude"],
-        text=df["windfarm_id"],
-        customdata=df["windfarm_id"],
-        marker=dict(size=15, opacity=0.6),
+default_windfarm = "1ec6d7a1-4b96-67a4-9358-df2d2b033685"
+default_turbine = "1ec6d7ce-93f7-6ef8-abda-53533bbf8f7e"
+df_map_wf = df_wf_turbine.groupby("windfarm_id")[["latitude", "longitude"]].mean().reset_index()
+data = [dict(
+    type="scattermapbox",
+    lon=df_map_wf["longitude"],
+    lat=df_map_wf["latitude"],
+    text=df_map_wf["windfarm_id"],
+    customdata=df_map_wf["windfarm_id"],
+    marker=dict(size=15, opacity=0.6)
     )]
-    figure = dict(data=trace, layout=layout)
-    return figure
+map_windfarms = dict(data=data, layout=layout)
 
-map_windfarms = create_map_windfarm()
-
-
+# Dashboard structure
 app.layout = html.Div(
     [
+        # Header
         html.Div(
             [
                 html.Div(
-                    [
-                        html.Img(
-                            src=app.get_asset_url("dst-logo.png"),
-                            id="dst_image",
-                            style={
-                                "height": "100px",
-                                "width": "100px",
-                                "margin-bottom": "5px",
-                            },
-                        )
-                    ],
-                    className="one-third column",
+                    html.Img(
+                        src=app.get_asset_url("dst-logo.png"),
+                        id="dst_image",
+                        style={
+                            "height": "10vh",
+                            "width": "10vh"
+                        },
+                    ),
+                    className="header"
+                    ),
+
+                html.Div(
+                    html.P("DataScientest Data Engineer Project |", id="title_dash_1"),
+                    className="header"
                 ),
                 html.Div(
-                        html.H3(
-                            "Into The Wind",
-                            style={"margin-bottom": "0px"},
-                        ),
-                    className="one-half column",
-                    id="title",
-                ),
+                    html.P("Into The Wind", id="title_dash_2"),
+                    className="header"
+                )
             ],
-            id="header",
             className="row flex-display",
-            style={"margin-bottom": "25px"},
+            style={"margin-bottom": "5px"},
         ),
 
+        # First row
         html.Div(
             [
             html.Div(
                 [dcc.Graph(id = "map_windfarm",
-                           figure = map_windfarms)],
+                           figure = map_windfarms,
+                           style = {"height" : "45vh"}
+                           )],
                 className = "pretty_container seven columns",
             ),
             html.Div(
@@ -108,6 +93,7 @@ app.layout = html.Div(
             className="row flex-display"
         ),
 
+        # Second row
         html.Div(
             [
             html.Div(
@@ -124,42 +110,73 @@ app.layout = html.Div(
                                             {"label":"Windspeed", "value":"wind_speed"}],
                                     value = "temp"
                                 ),
-                                style = {
-                                #"height": "60px",
-                                "width": "50%",
-                                "display": "inline-block"
-                                }
+                                className="dropdown"
                             ),
                             html.Div(
-                                html.P("Titre graph"),
-                                style = {
-                                #"height": "60px",
-                                "width": "80%",
-                                #"margin-left": "50px",
-                                "display": "inline-block",
-                                "justify-content":"center",
-                                "align-items":"center"
-                                }
-                            ),
-                            html.Div(
-                                html.P("Etiquette update"),
-                                style = {
-                                #"height": "60px",
-                                "width": "100%",
-                                "display": "inline-block",
-                                }
+                                html.P("Last update: "+date_forecast.strftime("%d/%m/%Y, %H:%M:%S")),
+                                id="date"
                             )
                         ],
-                        className="row container-display",
-                        id="weather_graph_header"
+                        className="row flex-display"
                     ),
-                    dcc.Graph(id = "forecast_weather_graph")
+                    dcc.Graph(id = "forecast_weather_graph", style = {"height" : "45vh"})
+                ],
+                className = "pretty_container seven columns",
+            ),
+            html.Div(
+                dcc.Loading(id = "loading_1", 
+                            children=[html.Div(dcc.Graph(id='forecast_power_wf_graph',style = {"height" : "50vh"}))],
+                            type="default"),
+                            className = "pretty_container seven columns",
+                            )
+            ],
+            className="row flex-display"
+        ),
+
+        # Third row
+        html.Div(
+            [
+            html.Div(
+                [dcc.Graph(id = "map_turbines", style = {"height" : "45vh"})],
+                className = "pretty_container seven columns",
+            ),
+            html.Div(
+                [html.Pre(id='click-data2', style = {"height" : "45vh"})],
+                className = "pretty_container seven columns",
+                )
+            ],
+            className="row flex-display"
+        ),
+
+        # Fourth row
+        html.Div(
+            [
+            html.Div(
+                [
+                    html.Div(
+                        [
+                            html.Div(
+                                dcc.Dropdown(
+                                    id = "scada_stats_dropdown",
+                                    options = [{"label":"Temperature", "value":"temp"}, 
+                                            {"label":"Humidity", "value":"humidity"}, 
+                                            {"label":"Pressure", "value":"pressure"}, 
+                                            {"label":"Clouds", "value":"clouds"}, 
+                                            {"label":"Windspeed", "value":"wind_speed"}],
+                                    value = "temp",
+                                ),
+                                className="dropdown"
+                            )
+                        ],
+                        className="row flex-display"
+                    ),
+                    dcc.Graph(id = "scada_stats_graph", style = {"height" : "45vh"})
                 ],
                 className = "pretty_container seven columns",
             ),
 
             html.Div(
-                [dcc.Graph(id = "forecast_power_wf_graph")],
+                [dcc.Graph(id = "forecast_power_wt_graph", style = {"height" : "50vh"})],
                 className = "pretty_container seven columns",
                 )
             ],
@@ -167,61 +184,26 @@ app.layout = html.Div(
         )
 
     ],
-    id="mainContainer",
+    id="main_container",
     style={"display": "flex", "flex-direction": "column"}
 )
 
-
 @app.callback(
-    Output('click-data', 'children'),
-    Input('map_windfarm', 'clickData'))
+    Output('click-data2', 'children'),
+    Input('map_turbines', 'clickData'))
 def display_click_data(clickData):
     return json.dumps(clickData, indent=2)
 
-
-# Map, slicer -> forecast weather
+# Map windfarm -> forecast power windfarm
 @app.callback(
-    Output("forecast_weather_graph", "figure"),
-    [
-        Input("map_windfarm", "clickData"),
-        Input("forecast_weather_dropdown", "value")
-    ]
-)
-def chart_forecast_weather(clickData, dropdown):
-    layout_fw = copy.deepcopy(layout)
-    if clickData is None:
-        clickData = {"points": [{"customdata": "1ec6d7a1-4b96-67a4-9358-df2d2b033685"}]}
-    df = df_forecast_weather[df_forecast_weather["windfarm_id"] == clickData["points"][0]["customdata"]]
-    data = [
-            dict(
-                type = "scatter",
-                mode = "lines",
-                name = "Forecast weather",
-                x = df.forecast_date,
-                y = df[dropdown],
-                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
-            )
-        ]
-    
-    yaxis = {"temp": "Celsius", "humidity": "%", "pressure": "hPa", "clouds": "", "wind_speed": "m/s"}
-    layout_fw["title"] = "Forecast weather - "+dropdown
-    layout_fw["yaxis"] = {'anchor': 'y', 'domain': [0.0, 1.0], 'title': {'text': yaxis[dropdown]}}
-
-    figure = dict(data=data, layout=layout_fw)
-    return figure
-
-# Map windfarm -> forecast power
-@app.callback(
-    Output("forecast_power_wf_graph", "figure"),
-    [
+        Output("forecast_power_wf_graph", "figure"),
         Input("map_windfarm", "clickData")
-    ]
 )
-def chart_forecast_power_wf(clickData):
+def graph_forecast_power_wf(clickData):
     layout_fpw = copy.deepcopy(layout)
     df = forecast_power_by_turbine(df_forecast_weather, df_power_curve).groupby(["forecast_date", "windfarm_id"])["power_kw"].sum().reset_index()
     if clickData is None:
-        clickData = {"points": [{"customdata": "1ec6d7a1-4b96-67a4-9358-df2d2b033685"}]}
+        clickData = {"points": [{"customdata": default_windfarm}]}
     df = df[df["windfarm_id"] == clickData["points"][0]["customdata"]]
 
     data = [
@@ -235,12 +217,96 @@ def chart_forecast_power_wf(clickData):
             )
         ]
     
-    layout_fpw["title"] = "Forecast power"
+    layout_fpw["title"] = "Forecast power in kW"
 
     figure = dict(data=data, layout=layout_fpw)
     return figure
 
+# Map, slicer -> forecast weather
+@app.callback(
+    Output("forecast_weather_graph", "figure"),
+    [
+        Input("map_windfarm", "clickData"),
+        Input("forecast_weather_dropdown", "value")
+    ]
+)
+def graph_forecast_weather(clickData, dropdown):
+    layout_fw = copy.deepcopy(layout)
+    if clickData is None:
+        clickData = {"points": [{"customdata": default_windfarm}]}
+    df = df_forecast_weather[df_forecast_weather["windfarm_id"] == clickData["points"][0]["customdata"]]
+    data = [
+            dict(
+                type = "scatter",
+                mode = "lines",
+                name = "Forecast weather",
+                x = df.forecast_date,
+                y = df[dropdown],
+                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
+            )
+        ]
+    
+    yaxis = {"temp": "°C", "humidity": "%", "pressure": "hPa", "clouds": "", "wind_speed": "m/s"}
+    layout_fw["title"] = "Forecast weather"
+    layout_fw["yaxis"] = {'automargin': True,'title': {'text': yaxis[dropdown]}}
 
+    figure = dict(data=data, layout=layout_fw)
+    return figure
+
+# Map windfarms -> Map turbines
+@app.callback(Output("map_turbines", "figure"),[Input("map_windfarm", "clickData")])
+def map_turbines(clickData):
+    layout_map = copy.deepcopy(layout)
+    if clickData is None:
+        clickData = {"points": [{"customdata": default_windfarm}]}
+    df = df_wf_turbine[df_wf_turbine["windfarm_id"] == clickData["points"][0]["customdata"]]
+    data = [dict(
+        type="scattermapbox",
+        lon=df["longitude"],
+        lat=df["latitude"],
+        text=df["windturbine_id"],
+        customdata=df["windturbine_id"],
+        marker=dict(size=15, opacity=0.6)
+        )]
+    
+    layout_map["title"] = "Turbines overview"
+    layout_map["mapbox"]=dict(
+        style="open-street-map",
+        center=dict(lon=df[["latitude", "longitude"]].mean()[1], 
+                    lat=df[["latitude", "longitude"]].mean()[0]),
+        zoom=12,
+        )
+
+    figure = dict(data=data, layout=layout_map)
+    return figure
+
+# Map turbines -> forecast power
+@app.callback(
+    Output("forecast_power_wt_graph", "figure"),
+    Input("map_turbines", "clickData")
+)
+def graph_forecast_power_turbine(clickData):
+    layout_fpmt = copy.deepcopy(layout)
+    df = forecast_power_by_turbine(df_forecast_weather, df_power_curve)
+    if clickData is None:
+        clickData = {"points": [{"customdata": default_turbine}]}
+    df = df[df["windturbine_id"] == clickData["points"][0]["customdata"]]
+
+    data = [
+            dict(
+                type = "scatter",
+                mode = "lines",
+                name = "Forecast power",
+                x = df.forecast_date,
+                y = df.power_kw,
+                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
+            )
+        ]
+    
+    layout_fpmt["title"] = "Forecast power in kW"
+
+    figure = dict(data=data, layout=layout_fpmt)
+    return figure
 
 if __name__ == '__main__':
     app.run_server(debug=True,host="0.0.0.0")

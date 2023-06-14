@@ -69,7 +69,6 @@ def forecast_power_by_turbine(df_forecast_weather: pd.DataFrame, df_power_curve:
     df_final.rename(columns = {"power": "power_kw"}, inplace = True)
     df_final.drop(columns = ["latitude", "longitude"], inplace=True)
     df_final.sort_values(by=["forecast_date", "windfarm_id", "windturbine_id"], inplace=True)
-    df_final["prod_kwh"] = df_final["power_kw"] * 3
     df_final.reset_index(inplace=True, drop=True)
     return df_final
 
@@ -83,11 +82,23 @@ def max_power_by_turbine(eng) -> pd.DataFrame:
         )
     return df_max_power
 
+def date_lastupdate_forecast(client) -> datetime:
+    """Return the date extraction of the last forecast weather update."""
+    date = client.forecast.find({}, {"extract_date" : 1}).sort("extract_date", -1).limit(1)
+    date = list(date)[0]["extract_date"]
+    return date
 
-if __name__ == "__main__":
-    client = mongodb_connection()
-    eng = mariadb_connection()
-    df_fw = last_forecast_weather_to_df(client)
-    df_pc = power_curve(eng)
-    df_fp = forecast_power_by_turbine(df_fw, df_pc)
-    print(df_fp.head())
+
+# Instanciation of df
+client = mongodb_connection()
+eng = mariadb_connection()
+
+df_forecast_weather = last_forecast_weather_to_df(client)
+df_power_curve = power_curve(eng)
+df_power_forecast = forecast_power_by_turbine(df_forecast_weather, df_power_curve)
+df_wf_turbine = pd.read_sql(
+        """SELECT *
+            FROM mariadb_itw.windturbines;""",
+        con=eng
+        )
+date_forecast = date_lastupdate_forecast(client) + timedelta(hours = 2)
