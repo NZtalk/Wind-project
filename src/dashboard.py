@@ -1,11 +1,8 @@
 import dash
-from dash import Dash, dcc, html, dash_table, Input, Output
-import pandas as pd
-import plotly.express as px 
+from dash import dcc, html, Input, Output
 from from_db_to_df import *
 import copy
 import json
-from datetime import datetime, timedelta
 
 # Template layout
 layout = dict(
@@ -86,8 +83,11 @@ app.layout = html.Div(
                 className = "pretty_container seven columns",
             ),
             html.Div(
-                [html.Pre(id='click-data')],
-                className = "pretty_container seven columns",
+                dcc.Loading(id = "loading_2", 
+                            children=[html.Div(dcc.Graph(id='scada_power_wf_graph',style = {"height" : "50vh"}))],
+                            type="default"
+                    ),
+                    className = "pretty_container seven columns",
                 )
             ],
             className="row flex-display"
@@ -141,7 +141,7 @@ app.layout = html.Div(
                 className = "pretty_container seven columns",
             ),
             html.Div(
-                [html.Pre(id='click-data2', style = {"height" : "45vh"})],
+                [dcc.Graph(id = "scada_power_wt_graph", style = {"height" : "50vh"})],
                 className = "pretty_container seven columns",
                 )
             ],
@@ -194,17 +194,22 @@ app.layout = html.Div(
 def display_click_data(clickData):
     return json.dumps(clickData, indent=2)
 
-# Map windfarm -> forecast power windfarm
+# Map windfarm -> forecast and SCADA power windfarm
 @app.callback(
-        Output("forecast_power_wf_graph", "figure"),
+        [Output("forecast_power_wf_graph", "figure"), Output("scada_power_wf_graph", "figure")],
         Input("map_windfarm", "clickData")
 )
 def graph_forecast_power_wf(clickData):
-    layout_fpw = copy.deepcopy(layout)
-    df = forecast_power_by_turbine(df_forecast_weather, df_power_curve).groupby(["forecast_date", "windfarm_id"])["power_kw"].sum().reset_index()
+    
     if clickData is None:
         clickData = {"points": [{"customdata": default_windfarm}]}
-    df = df[df["windfarm_id"] == clickData["points"][0]["customdata"]]
+        
+    windfarm_id = clickData["points"][0]["customdata"]
+    # Layout for Forecast Power Datas
+    layout_fpw = copy.deepcopy(layout)
+    df = forecast_power_by_turbine(df_forecast_weather, df_power_curve).groupby(["forecast_date", "windfarm_id"])["power_kw"].sum().reset_index()
+
+    df = df[df["windfarm_id"] == windfarm_id]
 
     data = [
             dict(
@@ -218,9 +223,29 @@ def graph_forecast_power_wf(clickData):
         ]
     
     layout_fpw["title"] = "Forecast power in kW"
-
-    figure = dict(data=data, layout=layout_fpw)
-    return figure
+    figure_fpw = dict(data=data, layout=layout_fpw)
+    
+    # Layout for SCADA WF Datas
+    wfCode = df_windfarms[df_windfarms['wfId'] == windfarm_id]['wfCode'].unique()[0]
+    
+    df_wf = df_scada_final[df_scada_final['wfId'] == windfarm_id].groupby(["log_date"])["active_power"].sum().reset_index()
+    
+    data_scada = [
+        dict(
+            type = "scatter",
+            mode = "lines",
+            name = "{}".format(wfCode),
+            x = df_wf.log_date,
+            y = df_wf.active_power,
+            line = dict(shape = "spline", smoothing = "2"),
+        )
+    ]
+    
+    layout_scada = copy.deepcopy(layout)
+    layout_scada["title"] = "SCADA Windfarm power production {}".format(wfCode)
+    figure_scada = dict(data=data_scada, layout=layout_scada)
+    
+    return figure_fpw, figure_scada
 
 # Map, slicer -> forecast weather
 @app.callback(
@@ -280,17 +305,19 @@ def map_turbines(clickData):
     figure = dict(data=data, layout=layout_map)
     return figure
 
-# Map turbines -> forecast power
+# Map turbines -> forecast and SCADA windturbine power
 @app.callback(
-    Output("forecast_power_wt_graph", "figure"),
-    Input("map_turbines", "clickData")
+        [Output("forecast_power_wt_graph", "figure"), Output("scada_power_wt_graph", "figure")],
+        Input("map_turbines", "clickData")
 )
 def graph_forecast_power_turbine(clickData):
     layout_fpmt = copy.deepcopy(layout)
     df = forecast_power_by_turbine(df_forecast_weather, df_power_curve)
     if clickData is None:
         clickData = {"points": [{"customdata": default_turbine}]}
-    df = df[df["windturbine_id"] == clickData["points"][0]["customdata"]]
+        
+    wtId = clickData["points"][0]["customdata"]
+    df = df[df["windturbine_id"] == wtId]
 
     data = [
             dict(
@@ -304,9 +331,29 @@ def graph_forecast_power_turbine(clickData):
         ]
     
     layout_fpmt["title"] = "Forecast power in kW"
-
     figure = dict(data=data, layout=layout_fpmt)
-    return figure
+
+    # Layout for SCADA WF Datas
+    wtCode = df_windturbines[df_windturbines['wtId'] == wtId]['wtCode'].unique()[0]
+    
+    df_wt = df_scada_final[df_scada_final['wtId'] == wtId].groupby(["log_date"])["active_power"].sum().reset_index()
+    
+    data_scada = [
+        dict(
+            type = "scatter",
+            mode = "lines",
+            name = "{}".format(wtCode),
+            x = df_wt.log_date,
+            y = df_wt.active_power,
+            line = dict(shape = "spline", smoothing = "2"),
+        )
+    ]
+    
+    layout_scada = copy.deepcopy(layout)
+    layout_scada["title"] = "SCADA Windturbine power production {}".format(wtCode)
+    figure_scada = dict(data=data_scada, layout=layout_scada)
+    
+    return figure, figure_scada
 
 if __name__ == '__main__':
     app.run_server(debug=True,host="0.0.0.0")

@@ -2,8 +2,8 @@ import pandas as pd
 from sqlalchemy import *
 from create_ref_mariadb import mariadb_connection
 from create_ref_mongodb import mongodb_connection
-import pymongo
 from datetime import datetime, timedelta
+import pytz
 
 
 def last_forecast_weather_to_df(client):
@@ -88,6 +88,64 @@ def date_lastupdate_forecast(client) -> datetime:
     date = list(date)[0]["extract_date"]
     return date
 
+# Fetch datas from MariaDB referentials
+def fetch_windturbines_data(engine) -> pd.DataFrame :
+    """
+    GET all windturbines in Dataframe
+    """
+    df = pd.read_sql(
+    """
+    SELECT wt.windturbine_id AS wtId, 
+        wt.code AS wtCode,
+        wf.windfarm_id AS wfId, 
+        wf.code AS wfCode, 
+        wf.latitude wfLat,
+        wf.longitude wfLon
+    FROM mariadb_itw.windturbines AS wt
+    INNER JOIN mariadb_itw.windfarms AS wf
+        ON wf.windfarm_id = wt.windfarm_id
+    WHERE wt.last_scada_update IS NOT NULL
+    ORDER BY wf.code ASC, wt.code ASC
+    ;
+    """,
+        con=engine
+    )
+    
+
+    return df
+
+def fetch_windfarms_data(engine) -> pd.DataFrame :
+    """
+    GET all windturbines in Dataframe
+    """
+    df = pd.read_sql(
+    """
+    SELECT wf.windfarm_id AS wfId, 
+        wf.code AS wfCode, 
+        wf.latitude wfLat,
+        wf.longitude wfLon
+    FROM mariadb_itw.windfarms AS wf
+    ORDER BY wf.code ASC;
+    """,
+        con=engine
+    )
+    
+
+    return df
+
+# Fetch SCADA datas from MongoDB
+def fetch_scada_data(client) -> pd.DataFrame:
+    tz = pytz.timezone('Europe/Paris')
+    current_datetime = datetime.now(tz)
+    lastday_datetime = current_datetime - timedelta(hours=24)
+
+    scada_col = client.scada
+    scada_data = scada_col.find({
+        "log_date": {'$gte': lastday_datetime}
+    }).sort("log_date", 1)
+
+    dfScada = pd.DataFrame(list(scada_data))
+    return dfScada
 
 # Instanciation of df
 client = mongodb_connection()
@@ -102,3 +160,8 @@ df_wf_turbine = pd.read_sql(
         con=eng
         )
 date_forecast = date_lastupdate_forecast(client) + timedelta(hours = 2)
+
+df_windturbines = fetch_windturbines_data(eng)
+df_windfarms = fetch_windfarms_data(eng)
+df_scada = fetch_scada_data(client)
+df_scada_final = df_scada.merge(df_windturbines, left_on="windturbine_id", right_on="wtId")
