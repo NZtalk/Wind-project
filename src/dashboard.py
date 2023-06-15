@@ -109,7 +109,7 @@ app.layout = html.Div(
                                             {"label":"Windspeed", "value":"wind_speed"}],
                                     value = "temp"
                                 ),
-                                id="dropdown_2"
+                                id="dropdown_1"
                             ),
                             html.Div(
                                 html.P("Last update: "+date_forecast.strftime("%d/%m/%Y, %H:%M:%S")),

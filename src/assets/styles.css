@@ -46,7 +46,7 @@ body {
   }
   
   #dropdown_1 {
-    flex: 1 1 1;
+    flex: 0.25;
   }
 
   #dropdown_2 {
