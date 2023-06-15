@@ -6,43 +6,32 @@ body {
     margin-right: 2.5%;
   }
   
-  .two.columns {
-    width: 16.25%;
-  }
-  
-  .column,
-  .columns {
-    margin-left: 0.5%;
-  }
   
   .pretty_container {
     border-radius: 5px;
     background-color: #f9f9f9;
     margin: 15px;
-    padding: 15px;
+    padding: 10px;
     position: relative;
     box-shadow: 2px 2px 2px rgb(211, 211, 211);
   }
   
-  .flex-display {
-    display: flex;
-  }
-  
-  .container-display {
+  .flex-align-display {
     display: flex;
     align-items: center;
-    
+  }
+
+  .flex-display {
+    display: flex;
   }
   
   #dst_image {
     border-radius: 5px;
     box-shadow: 2px 2px 2px rgb(211, 211, 211);
-    flex: 1;
   }
 
   .header {
-    display: inline-flex;
-    align-items: center;
+    flex: 1 1 1;
   }
 
   #title_dash_1 {
@@ -55,13 +44,13 @@ body {
     font-size: 4vh;
     color: #40e3bd;
   }
-
-  .top-graph {
-    display: flex
-  }
   
-  .dropdown {
-    flex: 0.4;
+  #dropdown_1 {
+    flex: 1 1 1;
+  }
+
+  #dropdown_2 {
+    flex: 0.25;
   }
 
   #date {

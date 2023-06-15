@@ -8,9 +8,9 @@ import json
 layout = dict(
     autosize=True,
     automargin=True,
-    margin=dict(l=30, r=30, b=20, t=30),
+    margin=dict(l=20, r=20, b=0, t=40),
     plot_bgcolor="#F9F9F9",
-    paper_bgcolor="#F9F9F9", #251f1f
+    paper_bgcolor="#F9F9F9",
     legend=dict(font=dict(size=10), orientation="h"),
     title="Windfarms overview",
     mapbox=dict(
@@ -68,7 +68,7 @@ app.layout = html.Div(
                     className="header"
                 )
             ],
-            className="row flex-display",
+            className="flex-align-display",
             style={"margin-bottom": "5px"},
         ),
 
@@ -76,17 +76,16 @@ app.layout = html.Div(
         html.Div(
             [
             html.Div(
-                [dcc.Graph(id = "map_windfarm",
+                dcc.Graph(id = "map_windfarm",
                            figure = map_windfarms,
                            style = {"height" : "45vh"}
-                           )],
+                           ),
                 className = "pretty_container seven columns",
             ),
             html.Div(
-                dcc.Loading(id = "loading_2", 
-                            children=[html.Div(dcc.Graph(id='scada_power_wf_graph',style = {"height" : "50vh"}))],
-                            type="default"
-                    ),
+                dcc.Graph(id='scada_power_wf_graph'
+                          ,style = {"height" : "50vh"}
+                          ),
                     className = "pretty_container seven columns",
                 )
             ],
@@ -110,7 +109,7 @@ app.layout = html.Div(
                                             {"label":"Windspeed", "value":"wind_speed"}],
                                     value = "temp"
                                 ),
-                                className="dropdown"
+                                id="dropdown_2"
                             ),
                             html.Div(
                                 html.P("Last update: "+date_forecast.strftime("%d/%m/%Y, %H:%M:%S")),
@@ -124,11 +123,9 @@ app.layout = html.Div(
                 className = "pretty_container seven columns",
             ),
             html.Div(
-                dcc.Loading(id = "loading_1", 
-                            children=[html.Div(dcc.Graph(id='forecast_power_wf_graph',style = {"height" : "50vh"}))],
-                            type="default"),
-                            className = "pretty_container seven columns",
-                            )
+                dcc.Graph(id='forecast_power_wf_graph',style = {"height" : "50vh"}),
+                className = "pretty_container seven columns",
+            )
             ],
             className="row flex-display"
         ),
@@ -158,14 +155,16 @@ app.layout = html.Div(
                             html.Div(
                                 dcc.Dropdown(
                                     id = "scada_stats_dropdown",
-                                    options = [{"label":"Temperature", "value":"temp"}, 
-                                            {"label":"Humidity", "value":"humidity"}, 
-                                            {"label":"Pressure", "value":"pressure"}, 
-                                            {"label":"Clouds", "value":"clouds"}, 
-                                            {"label":"Windspeed", "value":"wind_speed"}],
-                                    value = "temp",
+                                    options = [{"label":"Rotor speed", "value":"rotor_speed"}, 
+                                            {"label":"Generator speed", "value":"generator_speed"}, 
+                                            {"label":"Blades pitch angle", "value":"blades_pitch_angle"}, 
+                                            {"label":"Gen. bearings temp. 1", "value":"generator_bearings_temperature1"}, 
+                                            {"label":"Gen. bearings temp. 2", "value":"generator_bearings_temperature2"}],
+                                    value = "rotor_speed",
+                                    clearable=False,
+                                    searchable=False
                                 ),
-                                className="dropdown"
+                                id="dropdown_2"
                             )
                         ],
                         className="row flex-display"
@@ -185,7 +184,6 @@ app.layout = html.Div(
 
     ],
     id="main_container",
-    style={"display": "flex", "flex-direction": "column"}
 )
 
 @app.callback(
@@ -199,16 +197,17 @@ def display_click_data(clickData):
         [Output("forecast_power_wf_graph", "figure"), Output("scada_power_wf_graph", "figure")],
         Input("map_windfarm", "clickData")
 )
-def graph_forecast_power_wf(clickData):
+def graphs_windfarms(clickData):
     
     if clickData is None:
         clickData = {"points": [{"customdata": default_windfarm}]}
         
     windfarm_id = clickData["points"][0]["customdata"]
-    # Layout for Forecast Power Datas
-    layout_fpw = copy.deepcopy(layout)
-    df = forecast_power_by_turbine(df_forecast_weather, df_power_curve).groupby(["forecast_date", "windfarm_id"])["power_kw"].sum().reset_index()
 
+    # Forecast Windfarms Datas
+    layout_fpw = copy.deepcopy(layout)
+    df = df_power_forecast.groupby(["forecast_date", "windfarm_id"])["power"].sum().reset_index()
+    wfCode = df_windfarms[df_windfarms['wfId'] == windfarm_id]['wfCode'].unique()[0]
     df = df[df["windfarm_id"] == windfarm_id]
 
     data = [
@@ -217,17 +216,17 @@ def graph_forecast_power_wf(clickData):
                 mode = "lines",
                 name = "Forecast power",
                 x = df.forecast_date,
-                y = df.power_kw,
-                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
+                y = df.power,
+                line = dict(shape = "spline", smoothing = "2", color = "#40e3bd"),
             )
         ]
     
-    layout_fpw["title"] = "Forecast power in kW"
+    layout_fpw["title"] = "Power production forecast - windfarm {}".format(wfCode)
+    layout_fpw["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_fpw["margin"]=dict(l=40, r=40, b=40, t=40)
     figure_fpw = dict(data=data, layout=layout_fpw)
     
-    # Layout for SCADA WF Datas
-    wfCode = df_windfarms[df_windfarms['wfId'] == windfarm_id]['wfCode'].unique()[0]
-    
+    # SCADA Windfarms Datas
     df_wf = df_scada_final[df_scada_final['wfId'] == windfarm_id].groupby(["log_date"])["active_power"].sum().reset_index()
     
     data_scada = [
@@ -242,7 +241,9 @@ def graph_forecast_power_wf(clickData):
     ]
     
     layout_scada = copy.deepcopy(layout)
-    layout_scada["title"] = "SCADA Windfarm power production {}".format(wfCode)
+    layout_scada["margin"]=dict(l=40, r=40, b=40, t=40)
+    layout_scada["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_scada["title"] = "Power production SCADA - windfarm  {}".format(wfCode)
     figure_scada = dict(data=data_scada, layout=layout_scada)
     
     return figure_fpw, figure_scada
@@ -264,15 +265,17 @@ def graph_forecast_weather(clickData, dropdown):
             dict(
                 type = "scatter",
                 mode = "lines",
-                name = "Forecast weather",
+                name = "Weather forecasts",
                 x = df.forecast_date,
                 y = df[dropdown],
-                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
+                line = dict(shape = "spline", smoothing = "2", color = "#40e3bd")
             )
         ]
     
     yaxis = {"temp": "°C", "humidity": "%", "pressure": "hPa", "clouds": "", "wind_speed": "m/s"}
-    layout_fw["title"] = "Forecast weather"
+    layout_fw["margin"]=dict(l=40, r=40, b=40, t=40)
+    layout_fw["title"] = "Weather forecasts"
+    layout_fw["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
     layout_fw["yaxis"] = {'automargin': True,'title': {'text': yaxis[dropdown]}}
 
     figure = dict(data=data, layout=layout_fw)
@@ -294,7 +297,9 @@ def map_turbines(clickData):
         marker=dict(size=15, opacity=0.6)
         )]
     
-    layout_map["title"] = "Turbines overview"
+    wfCode = df_windfarms[df_windfarms['wfId'] == clickData["points"][0]["customdata"]]['wfCode'].unique()[0]
+
+    layout_map["title"] = "Turbines overview - windfarm {}".format(wfCode)
     layout_map["mapbox"]=dict(
         style="open-street-map",
         center=dict(lon=df[["latitude", "longitude"]].mean()[1], 
@@ -305,18 +310,21 @@ def map_turbines(clickData):
     figure = dict(data=data, layout=layout_map)
     return figure
 
-# Map turbines -> forecast and SCADA windturbine power
+# Map turbines -> forecast and SCADA windturbine power + SCADA stats
 @app.callback(
-        [Output("forecast_power_wt_graph", "figure"), Output("scada_power_wt_graph", "figure")],
-        Input("map_turbines", "clickData")
+        [Output("forecast_power_wt_graph", "figure"), Output("scada_power_wt_graph", "figure"), Output("scada_stats_graph", "figure")],
+        [Input("map_turbines", "clickData"),Input("scada_stats_dropdown", "value")]
 )
-def graph_forecast_power_turbine(clickData):
-    layout_fpmt = copy.deepcopy(layout)
-    df = forecast_power_by_turbine(df_forecast_weather, df_power_curve)
+def graphs_turbines(clickData, dropdown):
+    
     if clickData is None:
         clickData = {"points": [{"customdata": default_turbine}]}
-        
+
     wtId = clickData["points"][0]["customdata"]
+    wtCode = df_windturbines[df_windturbines['wtId'] == wtId]['wtCode'].unique()[0]
+
+    # Forecast Turbines Datas
+    df = df_power_forecast
     df = df[df["windturbine_id"] == wtId]
 
     data = [
@@ -325,17 +333,19 @@ def graph_forecast_power_turbine(clickData):
                 mode = "lines",
                 name = "Forecast power",
                 x = df.forecast_date,
-                y = df.power_kw,
-                line = dict(shape = "spline", smoothing = "2", color = "#F9ADA0"),
+                y = df.power,
+                line = dict(shape = "spline", smoothing = "2", color = "#40e3bd"),
             )
         ]
     
-    layout_fpmt["title"] = "Forecast power in kW"
+    layout_fpmt = copy.deepcopy(layout)
+    layout_fpmt["title"] = "Power production forecasts - windturbine {}".format(wtCode)
+    layout_fpmt["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_fpmt["margin"]=dict(l=40, r=40, b=40, t=40)
+    
     figure = dict(data=data, layout=layout_fpmt)
 
-    # Layout for SCADA WF Datas
-    wtCode = df_windturbines[df_windturbines['wtId'] == wtId]['wtCode'].unique()[0]
-    
+    # SCADA Turbines Datas
     df_wt = df_scada_final[df_scada_final['wtId'] == wtId].groupby(["log_date"])["active_power"].sum().reset_index()
     
     data_scada = [
@@ -350,10 +360,38 @@ def graph_forecast_power_turbine(clickData):
     ]
     
     layout_scada = copy.deepcopy(layout)
-    layout_scada["title"] = "SCADA Windturbine power production {}".format(wtCode)
+    layout_scada["title"] = "Power production SCADA - windturbine {}".format(wtCode)
+    layout_scada["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_scada["margin"]=dict(l=40, r=40, b=40, t=40)
     figure_scada = dict(data=data_scada, layout=layout_scada)
+
+    # SCADA stats
+    df = df_scada[df_scada["windturbine_id"] == wtId]
+
+    data_scada = [
+        dict(
+            type = "scatter",
+            mode = "lines",
+            name = "{}".format(wtCode),
+            x = df.log_date,
+            y = df[dropdown],
+            line = dict(shape = "spline", smoothing = "2"),
+        )
+    ]
     
-    return figure, figure_scada
+    layout_scada_stats = copy.deepcopy(layout)
+    layout_scada_stats["title"] = "Additional SCADA statistics - windturbine {}".format(wtCode)
+    layout_scada_stats["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_scada_stats["margin"]=dict(l=40, r=40, b=40, t=40)
+    yaxis = {"generator_speed": "rpm",
+             "blades_pitch_angle": "°",
+             "rotor_speed": "krpm", 
+             "generator_bearings_temperature1": "°C", 
+             "generator_bearings_temperature2": "°C"}
+    layout_scada_stats["yaxis"] = {'automargin': True,'title': {'text': yaxis[dropdown]}}
+    figure_scada_stats = dict(data=data_scada, layout=layout_scada)
+
+    return figure, figure_scada, figure_scada_stats
 
 if __name__ == '__main__':
     app.run_server(debug=True,host="0.0.0.0")
