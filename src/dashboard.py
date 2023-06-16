@@ -313,7 +313,7 @@ def map_turbines(clickData):
 # Map turbines -> forecast and SCADA windturbine power + SCADA stats
 @app.callback(
         [Output("forecast_power_wt_graph", "figure"), Output("scada_power_wt_graph", "figure"), Output("scada_stats_graph", "figure")],
-        [Input("map_turbines", "clickData"),Input("scada_stats_dropdown", "value")]
+        [Input("map_turbines", "clickData"), Input("scada_stats_dropdown", "value")]
 )
 def graphs_turbines(clickData, dropdown):
     
@@ -326,7 +326,6 @@ def graphs_turbines(clickData, dropdown):
     # Forecast Turbines Datas
     df = df_power_forecast
     df = df[df["windturbine_id"] == wtId]
-
     data = [
             dict(
                 type = "scatter",
@@ -366,30 +365,72 @@ def graphs_turbines(clickData, dropdown):
     figure_scada = dict(data=data_scada, layout=layout_scada)
 
     # SCADA stats
+    charts_params = {
+        "generator_speed": {
+            "title": "Vitesse du générateur {}".format(wtCode),
+            "unit": "rpm",
+            "xaxis": "log_date",
+            "xaxis_format": {"tickformat":"%H:%M\n%d %b, %y"},
+            "chart_type": "scatter",
+            "chart_mode": "lines",
+            "chart_name": ""
+        },
+        "blades_pitch_angle": {
+            "title": "Angles des pales / Vitesse de vent {}".format(wtCode),
+            "unit":  "°",
+            "xaxis": "wind_speed_average",
+            "xaxis_format": {},
+            "chart_type": "scatter",
+            "chart_mode": "markers",
+            "chart_name": ""
+        },
+        "rotor_speed": {
+            "title": "Vitesse du rotor {}".format(wtCode),
+            "unit":  "krpm", 
+            "xaxis": "log_date",
+            "xaxis_format": {"tickformat":"%H:%M\n%d %b, %y"},
+            "chart_type": "scatter",
+            "chart_mode": "lines",
+            "chart_name": ""
+        },
+        "generator_bearings_temperature1": {
+            "title": "Températures roulement générateur {}".format(wtCode),
+            "unit":  "°C", 
+            "xaxis": "log_date",
+            "xaxis_format": {"tickformat":"%H:%M\n%d %b, %y"},
+            "chart_type": "scatter",
+            "chart_mode": "lines",
+            "chart_name": ""
+        },
+        "generator_bearings_temperature2": {
+            "title": "Températures roulement générateur {}".format(wtCode),
+            "unit":  "°C", 
+            "xaxis": "log_date",
+            "xaxis_format": {"tickformat":"%H:%M\n%d %b, %y"},
+            "chart_type": "scatter",
+            "chart_mode": "lines",
+            "chart_name": ""
+        },
+    }
     df = df_scada[df_scada["windturbine_id"] == wtId]
 
     data_scada = [
         dict(
-            type = "scatter",
-            mode = "lines",
+            type = charts_params[dropdown]['chart_type'],
+            mode = charts_params[dropdown]['chart_mode'],
             name = "{}".format(wtCode),
-            x = df.log_date,
+            x = df[charts_params[dropdown]['xaxis']],
             y = df[dropdown],
             line = dict(shape = "spline", smoothing = "2"),
         )
     ]
     
     layout_scada_stats = copy.deepcopy(layout)
-    layout_scada_stats["title"] = "Additional SCADA statistics - windturbine {}".format(wtCode)
-    layout_scada_stats["xaxis"]= {"tickformat":"%H:%M\n%d %b, %y"}
+    layout_scada_stats["title"] = charts_params[dropdown]['title']
+    layout_scada_stats["xaxis"]= charts_params[dropdown]['xaxis_format']
     layout_scada_stats["margin"]=dict(l=40, r=40, b=40, t=40)
-    yaxis = {"generator_speed": "rpm",
-             "blades_pitch_angle": "°",
-             "rotor_speed": "krpm", 
-             "generator_bearings_temperature1": "°C", 
-             "generator_bearings_temperature2": "°C"}
-    layout_scada_stats["yaxis"] = {'automargin': True,'title': {'text': yaxis[dropdown]}}
-    figure_scada_stats = dict(data=data_scada, layout=layout_scada)
+    layout_scada_stats["yaxis"] = {'automargin': True,'title': {'text': charts_params[dropdown]['unit']}}
+    figure_scada_stats = dict(data=data_scada, layout=layout_scada_stats)
 
     return figure, figure_scada, figure_scada_stats
 

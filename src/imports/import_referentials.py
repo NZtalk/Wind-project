@@ -1,3 +1,10 @@
+import sys
+import os
+
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
 from sqlalchemy import *
 from dotenv import load_dotenv
 import os

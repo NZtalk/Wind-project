@@ -1,14 +1,30 @@
+import sys
+import os
+ 
+# getting the name of the directory
+# where the this file is present.
+current = os.path.dirname(os.path.realpath(__file__))
+ 
+# Getting the parent directory name
+# where the current directory is present.
+parent = os.path.dirname(current)
+ 
+# adding the parent directory to
+# the sys.path.
+sys.path.append(parent)
+ 
+# setting path
 from sqlalchemy import select, update, bindparam
 from sqlalchemy.orm import Session
 from dotenv import load_dotenv
-from classes.WindAPI import *
 from datetime import datetime, timedelta
-from create_ref_mongodb import mongodb_connection
-from create_ref_mariadb import mariadb_connection, windturbines
 import pytz
 import logging
 from pandas import to_datetime
 from pandas.api.types import is_datetime64_any_dtype as is_datetime
+from classes.WindAPI import *
+from db.create_ref_mongodb import mongodb_connection
+from db.create_ref_mariadb import mariadb_connection, windturbines
 
 # Charger les variables d'environnement à partir du fichier .env
 load_dotenv()

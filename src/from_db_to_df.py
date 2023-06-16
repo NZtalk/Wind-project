@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import *
-from create_ref_mariadb import mariadb_connection
-from create_ref_mongodb import mongodb_connection
+from db.create_ref_mariadb import mariadb_connection
+from db.create_ref_mongodb import mongodb_connection
 from datetime import datetime, timedelta
 import pytz
 
@@ -124,7 +124,7 @@ def fetch_windfarms_data(engine) -> pd.DataFrame :
 def fetch_scada_data(client) -> pd.DataFrame:
     tz = pytz.timezone('Europe/Paris')
     current_datetime = datetime.now(tz)
-    lastday_datetime = current_datetime - timedelta(hours=24)
+    lastday_datetime = current_datetime - timedelta(days=2)
 
     scada_col = client.scada
     scada_data = scada_col.find({

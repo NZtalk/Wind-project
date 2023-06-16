@@ -1,6 +1,13 @@
-from api_weather import ForecastWeatherAPI
-from create_ref_mongodb import mongodb_connection
-from create_ref_mariadb import mariadb_connection
+import sys
+import os
+
+current = os.path.dirname(os.path.realpath(__file__))
+parent = os.path.dirname(current)
+sys.path.append(parent)
+
+from classes.ForecastWeatherAPI import ForecastWeatherAPI
+from db.create_ref_mongodb import mongodb_connection
+from db.create_ref_mariadb import mariadb_connection
 import pandas as pd
 
 client = mongodb_connection()
