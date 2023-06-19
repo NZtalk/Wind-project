@@ -1,0 +1,16 @@
+apiVersion: networking.k8s.io/V1
+kind: Ingress
+metadata:
+    name: api-project-ingress
+spec:
+    rules:
+        - host: IP-public/DNS-sandbox
+          http:
+            paths:
+            - path: /
+              pathType: Prefix
+              backend:
+                service:
+                    name: itw-project-service
+                    port:
+                        number: 8000

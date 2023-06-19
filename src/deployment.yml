@@ -1,0 +1,19 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+    name: itw-project-deployment
+spec:
+    replicas: 3
+    selector:
+        matchLabels:
+        app: itw-project
+    template:
+        metadata:
+            labels:
+                apps: itw-project
+        spec:
+            containers:
+            - name: itw-project
+              image: jaroduchiwa/fastapi_itw-project
+              ports:
+                - containerPort: 8000
