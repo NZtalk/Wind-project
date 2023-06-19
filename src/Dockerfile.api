@@ -1,17 +1,21 @@
 FROM python:3.9-alpine
 
-RUN apk update && apk add --nocache py-pip
+RUN apk add --no-cache mariadb-connector-c-dev \
+    && apk add --no-cache --virtual .build-deps gcc musl-dev \
+    && pip install --no-cache-dir PyMySQL
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY main.py requirements.txt ./
 
-COPY main.py .
+RUN pip install --no-cache-dir -r requirements.txt
 
 EXPOSE 8000
 
-CMD uvicorn main:server --host 0.0.0.0
+CMD ["uvicorn", "main:server", "--host", "0.0.0.0"]
+
 
 LABEL version="1.0.0"
 LABEL description="FastAPI ITW Project"
+
+
