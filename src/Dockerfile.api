@@ -1,0 +1,17 @@
+FROM python:3.9-alpine
+
+RUN apk update && apk add --nocache py_pip
+
+WORKDIR /app
+
+COPY requirements.txt .
+RUN pip install --nocache-dir -r requirements.txt
+
+COPY main.py .
+
+EXPOSE 8000
+
+CMD uvicorn main:server --host 0.0.0.0
+
+LABEL version="1.0.0"
+LABEL description="FastAPI ITW Project"
