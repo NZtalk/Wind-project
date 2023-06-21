@@ -1,13 +1,29 @@
 version: "3.5"
 
 services:
-  python:
-    build: .
-    container_name: python-itw
-    command: uvicorn src.main:app --host 0.0.0.0 --port 80 --reload
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile_api
+    container_name: api-itw
     ports:
       - 80:80
       - 5678:5678
+    volumes:
+      - .:/app
+    depends_on:
+      - mongodb
+      - mariadb
+    networks:
+      - app-itw
+
+  dash:
+    build:
+      context: .
+      dockerfile: Dockerfile_dash
+    container_name: dash-itw
+    ports:
+      - 8050:8050
     volumes:
       - .:/app
     depends_on:

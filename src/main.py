@@ -592,9 +592,6 @@ async def delete_windturbine(windturbine_id: str):
     # Return success message
     return {"message": f"All data in windturbines with windturbine_id {windturbine_id} deleted successfully"}
 
-
-
-
 @app.get("/ping")
 async def ping():
     """Vérifie que l'API est fonctionnelle."""
