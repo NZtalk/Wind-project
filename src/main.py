@@ -18,8 +18,6 @@ from sqlalchemy.types import TypeDecorator
 from sqlalchemy.exc import IntegrityError
 import math
 
-
-
 app = FastAPI()
 
 load_dotenv()
