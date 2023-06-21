@@ -2,14 +2,15 @@
 
 `docker-compose build`
 
+`docker compose up airflow-init`
+
 `docker-compose up -d`
 
 ## Access Docker containers
 
 `docker exec -it python-itw bash`
 
-# Stage 1 : Scraping
+## Access services via browser 
 
-- WindAPI.py class to get data from API
-- script get_eol_data.py to get data from Eol by cron
-- script api_weather.py to get data from openweathermap API
+* Dash : http://localhost:8050
+* Airflow : http://localhost:8080 (log: airflow / pass: airflow)
