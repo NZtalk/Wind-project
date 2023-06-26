@@ -1,26 +1,35 @@
-FROM python:3.11-slim
+# Dockerfile for the Python service
+FROM python:3.9-slim
 
-ARG POETRY_HOME=/etc/poetry
-ENV PATH="${PATH}:${POETRY_HOME}/bin"
+ARG POETRY_HOME=/opt/poetry
+ENV PATH="${POETRY_HOME}/bin:${PATH}"
 
-# set the working directory
+# Set the working directory
 WORKDIR /app
-COPY poetry.lock pyproject.toml ./
 
-# install dependencies
-RUN apt update -y && apt upgrade -y && apt install curl -y && apt install gcc -y && apt install cron -y
-RUN curl -sSL https://install.python-poetry.org | POETRY_HOME=${POETRY_HOME} python3 -
-RUN poetry config virtualenvs.create false
-RUN poetry install --no-dev 
+# Install system dependencies
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    curl \
+    gcc \
+    cron \
+    && rm -rf /var/lib/apt/lists/*
 
-# copy the src to the folder
-COPY .env .
-COPY ./src ./src
+# Install Poetry
+RUN curl -sSL https://install.python-poetry.org | python3 -
 
-# crontab
-COPY crontab /etc/crontab
-RUN crontab /etc/crontab
-# RUN chmod 600 /etc/crontab
+# Copy the project files
+COPY pyproject.toml poetry.lock ./
+COPY src/ ./src/
 
-# start the server
+# Install project dependencies
+RUN poetry config virtualenvs.create false && \
+    poetry install --no-dev --no-interaction --no-ansi
+
+# Set the entrypoint and command for the container
+ENTRYPOINT []
+
+# Start the Python application
 CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "80", "--reload"]
+
+
+
