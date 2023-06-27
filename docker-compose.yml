@@ -1,4 +1,4 @@
-version: "3.5"
+version: '3.5'
 
 services:
   python:
@@ -24,12 +24,21 @@ services:
     environment:
       - AIRFLOW__CORE__FERNET_KEY=__GENERATE_RANDOM_SECRET_KEY__
       - AIRFLOW__CORE__LOAD_EXAMPLES=False
+      - AIRFLOW__CORE__EXECUTOR=CeleryExecutor
+      - AIRFLOW__CORE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__RESULT_BACKEND=db+postgresql://airflow:airflow@postgres/airflow
+      - AIRFLOW__CELERY__BROKER_URL=redis://:@redis:6379/0
+      - AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION=true
+      - AIRFLOW__API__AUTH_BACKEND=airflow.api.auth.backend.basic_auth
     volumes:
       - ./dags:/opt/airflow/dags
       - ./logs:/opt/airflow/logs
       - ./plugins:/opt/airflow/plugins
     ports:
       - "8080:8080"
+    depends_on:
+      - redis
+      - postgres
     networks:
       - app-itw
 
@@ -45,13 +54,18 @@ services:
     image: postgres:13
     container_name: postgres-itw
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: airflow
+      POSTGRES_PASSWORD: airflow
+      POSTGRES_DB: airflow
     volumes:
       - postgres-data:/var/lib/postgresql/data
     expose:
       - 5432
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "airflow"]
+      interval: 5s
+      retries: 5
+    restart: always
     networks:
       - app-itw
 
@@ -90,6 +104,15 @@ services:
     networks:
       - app-itw
 
+  airflow-init:
+    image: apache/airflow:2.2.3
+    container_name: airflow-init
+    command: airflow initdb
+    depends_on:
+      - postgres
+    networks:
+      - app-itw
+
 networks:
   app-itw:
     driver: bridge
@@ -101,6 +124,9 @@ volumes:
     driver: local
   mariadb-data:
     driver: local
+
+
+
 
 
 
